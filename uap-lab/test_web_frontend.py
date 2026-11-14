@@ -1,5 +1,7 @@
 import http.client,json,os,tempfile,threading,time,unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
 from web_frontend import server
 class Backend(BaseHTTPRequestHandler):
@@ -28,6 +30,13 @@ class FrontendTests(unittest.TestCase):
   self.assertEqual(self.request('/api/live/frame?after='+str(preview.stat().st_mtime)),(204,b''))
   os.utime(preview,(time.time()-10,time.time()-10))
   self.assertEqual(self.request('/api/live/frame')[0],503)
+ def test_youtube_off_does_not_replace_local_camera_or_pip_frames(self):
+  preview=Path(self.tmp.name)/'preview.jpg';preview.write_bytes(b'local-camera-frame');self.front.preview=preview
+  youtube_off=SimpleNamespace(live_streaming=lambda:False,standby_frame=lambda:b'youtube-standby')
+  with patch.dict('sys.modules',{'station_settings':youtube_off}):
+   self.assertEqual(self.request('/api/live/frame'),(200,b'local-camera-frame'))
+   self.assertEqual(self.request('/api/live/frame?after='+str(preview.stat().st_mtime)),(204,b''))
+   self.assertEqual(self.request('/api/live/frame',method='HEAD'),(200,b''))
  def test_failed_request_with_healthy_backend_returns_retryable_error(self):
   status,body=self.request('/api/disconnect')
   self.assertEqual(status,503)
