@@ -15,7 +15,8 @@ from temporal_runtime import TemporalRuntime
 from recognition_preview import RecognitionPreview
 from classification_policy import eligible,apply_results
 from night_context import enabled as context_enabled,predict as predict_context
-from crop_geometry import context_bounds
+from crop_geometry import context_bounds,review_region
+from model_settings import effective as decision_policy,snapshot as decision_settings
 from recognition_alerts import AlertOutbox
 
 def read(path,default=None):
@@ -39,7 +40,7 @@ def read_index(folder,offset):
   return b'',0,b'' # New capture generation can precede its first closed segment.
 
 def run(config,output,stop,start_segment=None,stop_segment=None):
- output.mkdir(parents=True,exist_ok=True);root=Path(config['spool']);policy=read(Path(config['policy']));cv2.setNumThreads(int(config.get('motion_threads',2)))
+ output.mkdir(parents=True,exist_ok=True);root=Path(config['spool']);policy=read(Path(config['policy']));base_policy=policy;cv2.setNumThreads(int(config.get('motion_threads',2)))
  sink=None
  alerts=AlertOutbox(config['alert_outbox'],config.get('alert_not_before_epoch',0)) if config.get('alert_outbox') and stop_segment is None else None
  cv2.setNumThreads(int(config.get('motion_threads',2)))
@@ -118,6 +119,7 @@ def run(config,output,stop,start_segment=None,stop_segment=None):
        checkpoint().result();pin() # Acknowledge the closed generation before replacing its cursor.
        state.update(generation=later[0][1],offset=0,last_sequence=None,last_pts=None,coverage_start_pts=0,coverage_first_sequence=None,tracks={},track_serial=0);detector=NativeMotion();tracker=NativeTracks(state['generation']);folder=root/state['generation'];checkpoint();continue
      stop.wait(.05);continue
+    policy=decision_policy(base_policy,config.get('decision_lane','human'),decision_settings(output.parent))
     temporal.refresh();entry=json.loads(line);segment=int(Path(entry['file']).stem.split('-')[-1])
     if stop_segment is not None and segment>=stop_segment:break
     source_started=time.perf_counter();source=folder/entry['file']
@@ -157,22 +159,19 @@ def run(config,output,stop,start_segment=None,stop_segment=None):
      if state['coverage_first_sequence'] is None:state['coverage_first_sequence']=seq
      boxes,metrics=detector.update(image,pts)
      if sink:sink.submit(timing,boxes,metrics,state['generation'],health,state)
-     observations=tracker.update(seq,pts,boxes);encoded=[];indices=[];contexts=[];night=context_enabled(policy,timing["received_epoch"])
+     observations=tracker.update(seq,pts,boxes);encoded=[];indices=[];contexts=[]
      for observation_index,observation in enumerate(observations):
       x,y,w,h=observation['box'];crop=image[y:y+h,x:x+w]
       from temporal_model import shape_descriptor
       observation['shape_descriptor']=shape_descriptor(crop)
       if not eligible(observation,policy):continue
-      classifier_crop=cv2.cvtColor(header['native_rgb'][y:y+h,x:x+w],cv2.COLOR_RGB2BGR) if policy.get('input_color_space')=='RGB' else crop
+      pixels,review_bounds=review_region(header['native_rgb'],observation['box'])
+      classifier_crop=cv2.cvtColor(pixels,cv2.COLOR_RGB2BGR) if policy.get('input_color_space')=='RGB' else cv2.cvtColor(pixels,cv2.COLOR_RGB2GRAY)
       ok,data=cv2.imencode('.png',classifier_crop)
       if not ok:raise ValueError('Native crop encoding failed')
+      observation.update(classification_bounds=review_bounds,input_contract='review-box-v1',decision_lane=config.get('decision_lane','human'),decision_settings_revision=policy.get('settings_revision',0))
+      observation['classification_pixels_sha256']=hashlib.sha256(f'{pixels.shape[1]}x{pixels.shape[0]}:RGB:'.encode()+pixels.tobytes()).hexdigest()
       encoded.append(data.tobytes());indices.append(observation_index)
-      if night:
-       bx,by,bw,bh=context_bounds(observation['box'],image.shape[1],image.shape[0])
-       context=cv2.cvtColor(header['native_rgb'][by:by+bh,bx:bx+bw],cv2.COLOR_RGB2BGR)
-       ok,context_data=cv2.imencode('.png',context)
-       if not ok:raise ValueError('Night context crop encoding failed')
-       contexts.append(context_data.tobytes())
      temporal.observe_many(observations,tracker.tracks,pts,image.shape[1],image.shape[0])
      row=dict(timing,observations=observations,classification_indices=indices)
      if alerts:

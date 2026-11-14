@@ -1,0 +1,3 @@
+import os,json,hashlib,pathlib,torch
+root=pathlib.Path('/Volumes/UFO-Work/field/research-v1');torch.hub.set_dir(str(root/'torch-hub'));torch.set_num_threads(2)
+m=torch.hub.load('facebookresearch/dinov2','dinov2_vits14',pretrained=True,trust_repo=True).eval();torch.save(m.state_dict(),root/'dinov2-vits14.pt');p=root/'dinov2-vits14.pt';(root/'backbone-receipt.json').write_text(json.dumps(dict(model='facebookresearch/dinov2:dinov2_vits14',sha256=hashlib.sha256(p.read_bytes()).hexdigest(),parameters=sum(p.numel() for p in m.parameters()),mps=torch.backends.mps.is_available())));print('downloaded',flush=True)

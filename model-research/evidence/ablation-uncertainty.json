@@ -1,0 +1,414 @@
+{
+  "method": "2000 paired recording-cluster bootstrap replicates; historical development selection, not independent confirmatory inference",
+  "recordings": 304,
+  "runs": [
+    {
+      "name": "mobilenet-linear-class-731",
+      "confidence_intervals": {
+        "recall": [
+          0.6924637837062536,
+          0.944761193807385
+        ],
+        "false_positive_rate": [
+          0.09349889922549319,
+          0.17151926449798524
+        ],
+        "precision": [
+          0.44381155303030306,
+          0.7097233733193178
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-linear-class-947",
+      "confidence_intervals": {
+        "recall": [
+          0.6924637837062536,
+          0.944761193807385
+        ],
+        "false_positive_rate": [
+          0.09349889922549319,
+          0.17151926449798524
+        ],
+        "precision": [
+          0.44381155303030306,
+          0.7097233733193178
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-linear-class-1201",
+      "confidence_intervals": {
+        "recall": [
+          0.6924637837062536,
+          0.944761193807385
+        ],
+        "false_positive_rate": [
+          0.09349889922549319,
+          0.17151926449798524
+        ],
+        "precision": [
+          0.44381155303030306,
+          0.7097233733193178
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-linear-recording-731",
+      "confidence_intervals": {
+        "recall": [
+          0.6901659439164697,
+          0.9483437805589305
+        ],
+        "false_positive_rate": [
+          0.08805945683618521,
+          0.16514531057622936
+        ],
+        "precision": [
+          0.45720251843220483,
+          0.7178666558498626
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-linear-recording-947",
+      "confidence_intervals": {
+        "recall": [
+          0.6901659439164697,
+          0.9483437805589305
+        ],
+        "false_positive_rate": [
+          0.08805945683618521,
+          0.16514531057622936
+        ],
+        "precision": [
+          0.45720251843220483,
+          0.7178666558498626
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-linear-recording-1201",
+      "confidence_intervals": {
+        "recall": [
+          0.6901659439164697,
+          0.9483437805589305
+        ],
+        "false_positive_rate": [
+          0.08805945683618521,
+          0.16514531057622936
+        ],
+        "precision": [
+          0.45720251843220483,
+          0.7178666558498626
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-class-731",
+      "confidence_intervals": {
+        "recall": [
+          0.6810177233129732,
+          0.9567515828225579
+        ],
+        "false_positive_rate": [
+          0.06905726364171934,
+          0.15255511245554687
+        ],
+        "precision": [
+          0.4812386432465173,
+          0.7595030488603737
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-class-947",
+      "confidence_intervals": {
+        "recall": [
+          0.6924558368238936,
+          0.9599055037585995
+        ],
+        "false_positive_rate": [
+          0.07419344783203281,
+          0.16345743503195811
+        ],
+        "precision": [
+          0.4649468796726214,
+          0.7516596045197739
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-class-1201",
+      "confidence_intervals": {
+        "recall": [
+          0.6898067802793412,
+          0.9579265866317681
+        ],
+        "false_positive_rate": [
+          0.06676793008466195,
+          0.14568154989469728
+        ],
+        "precision": [
+          0.4983526965094933,
+          0.7661996529475021
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-recording-731",
+      "confidence_intervals": {
+        "recall": [
+          0.6813077357881138,
+          0.9532990370297679
+        ],
+        "false_positive_rate": [
+          0.05680921680555774,
+          0.13088347821647733
+        ],
+        "precision": [
+          0.5272776501761218,
+          0.7881027325568838
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-recording-947",
+      "confidence_intervals": {
+        "recall": [
+          0.6871754494717675,
+          0.9517066441043404
+        ],
+        "false_positive_rate": [
+          0.05877031405385357,
+          0.13466874316336663
+        ],
+        "precision": [
+          0.5105121442488634,
+          0.7840184191456449
+        ]
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-recording-1201",
+      "confidence_intervals": {
+        "recall": [
+          0.6871015524285828,
+          0.9518197447376386
+        ],
+        "false_positive_rate": [
+          0.057200611500823284,
+          0.13358337791062178
+        ],
+        "precision": [
+          0.5126900111561141,
+          0.7846410585986078
+        ]
+      }
+    },
+    {
+      "name": "dinov2-linear-class-731",
+      "confidence_intervals": {
+        "recall": [
+          0.7471151888380299,
+          0.9579014500537056
+        ],
+        "false_positive_rate": [
+          0.07386343153291508,
+          0.1493573773575227
+        ],
+        "precision": [
+          0.483179822798042,
+          0.7646455868437014
+        ]
+      }
+    },
+    {
+      "name": "dinov2-linear-class-947",
+      "confidence_intervals": {
+        "recall": [
+          0.7471151888380299,
+          0.9579014500537056
+        ],
+        "false_positive_rate": [
+          0.07386343153291508,
+          0.1493573773575227
+        ],
+        "precision": [
+          0.483179822798042,
+          0.7646455868437014
+        ]
+      }
+    },
+    {
+      "name": "dinov2-linear-class-1201",
+      "confidence_intervals": {
+        "recall": [
+          0.7471151888380299,
+          0.9579014500537056
+        ],
+        "false_positive_rate": [
+          0.07386343153291508,
+          0.1493573773575227
+        ],
+        "precision": [
+          0.483179822798042,
+          0.7646455868437014
+        ]
+      }
+    },
+    {
+      "name": "dinov2-linear-recording-731",
+      "confidence_intervals": {
+        "recall": [
+          0.7275679108852843,
+          0.957276009115105
+        ],
+        "false_positive_rate": [
+          0.0688443158795712,
+          0.1419181717702307
+        ],
+        "precision": [
+          0.4971082081244705,
+          0.7719481911203291
+        ]
+      }
+    },
+    {
+      "name": "dinov2-linear-recording-947",
+      "confidence_intervals": {
+        "recall": [
+          0.7275679108852843,
+          0.957276009115105
+        ],
+        "false_positive_rate": [
+          0.0688443158795712,
+          0.1419181717702307
+        ],
+        "precision": [
+          0.4971082081244705,
+          0.7719481911203291
+        ]
+      }
+    },
+    {
+      "name": "dinov2-linear-recording-1201",
+      "confidence_intervals": {
+        "recall": [
+          0.7275679108852843,
+          0.957276009115105
+        ],
+        "false_positive_rate": [
+          0.0688443158795712,
+          0.1419181717702307
+        ],
+        "precision": [
+          0.4971082081244705,
+          0.7719481911203291
+        ]
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-class-731",
+      "confidence_intervals": {
+        "recall": [
+          0.6964151413870321,
+          0.9321170951896269
+        ],
+        "false_positive_rate": [
+          0.06062874096156042,
+          0.13535066617833386
+        ],
+        "precision": [
+          0.5020432129646931,
+          0.7769459762376636
+        ]
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-class-947",
+      "confidence_intervals": {
+        "recall": [
+          0.6713165266106442,
+          0.933249893025246
+        ],
+        "false_positive_rate": [
+          0.05620081751205523,
+          0.12633397233673774
+        ],
+        "precision": [
+          0.5179036513595336,
+          0.7889514355986343
+        ]
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-class-1201",
+      "confidence_intervals": {
+        "recall": [
+          0.6613702910310706,
+          0.9245130622104897
+        ],
+        "false_positive_rate": [
+          0.055808689010341965,
+          0.12466230778151907
+        ],
+        "precision": [
+          0.5167867687844414,
+          0.7873026744944552
+        ]
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-recording-731",
+      "confidence_intervals": {
+        "recall": [
+          0.6593620025392933,
+          0.9385026737967914
+        ],
+        "false_positive_rate": [
+          0.0555775213321007,
+          0.12195868702800143
+        ],
+        "precision": [
+          0.5268934037476722,
+          0.7900796148785507
+        ]
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-recording-947",
+      "confidence_intervals": {
+        "recall": [
+          0.6557503189047985,
+          0.9363909238137152
+        ],
+        "false_positive_rate": [
+          0.05320070032730073,
+          0.11641720828119027
+        ],
+        "precision": [
+          0.5364680236210579,
+          0.7984008153372054
+        ]
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-recording-1201",
+      "confidence_intervals": {
+        "recall": [
+          0.6609013286897479,
+          0.9331035350268843
+        ],
+        "false_positive_rate": [
+          0.052318253068496,
+          0.11723611534770495
+        ],
+        "precision": [
+          0.5379078267626645,
+          0.7981876300230586
+        ]
+      }
+    }
+  ]
+}

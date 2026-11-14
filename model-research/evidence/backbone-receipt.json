@@ -1,0 +1,1 @@
+{"model": "facebookresearch/dinov2:dinov2_vits14", "sha256": "7d5ca5f522d32408ca0a700a46294d93df3cafc360a3d270ec171a53d161b711", "parameters": 22056576, "mps": true}

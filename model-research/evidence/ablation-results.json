@@ -1,0 +1,656 @@
+{
+  "scope": "Historical development only; selected class/group-balanced cohort, not population or unseen accuracy",
+  "samples": 6175,
+  "excluded_conflicting_pixels": 0,
+  "protocol": "five recording/pixel-linked folds; train 3, calibration 1, evaluation 1; threshold targets calibration recall >=90%; each factor varied independently",
+  "results": [
+    {
+      "name": "mobilenet-linear-class-731",
+      "backbone": "mobilenet",
+      "head": "linear",
+      "balance": "class",
+      "seed": 731,
+      "thresholds": [
+        0.4900902509689331,
+        0.43564149737358093,
+        0.005103584378957748,
+        0.010475692339241505,
+        0.015364836901426315
+      ],
+      "metrics": {
+        "tp": 966,
+        "fp": 656,
+        "tn": 4351,
+        "fn": 202,
+        "recall": 0.827054794520548,
+        "precision": 0.5955610357583231,
+        "false_positive_rate": 0.1310165767924905,
+        "accuracy": 0.8610526315789474,
+        "average_precision": 0.8574859338096387,
+        "brier": 0.0675462075727492,
+        "ece": 0.056390960020986466
+      }
+    },
+    {
+      "name": "mobilenet-linear-class-947",
+      "backbone": "mobilenet",
+      "head": "linear",
+      "balance": "class",
+      "seed": 947,
+      "thresholds": [
+        0.4900902509689331,
+        0.43564149737358093,
+        0.005103584378957748,
+        0.010475692339241505,
+        0.015364836901426315
+      ],
+      "metrics": {
+        "tp": 966,
+        "fp": 656,
+        "tn": 4351,
+        "fn": 202,
+        "recall": 0.827054794520548,
+        "precision": 0.5955610357583231,
+        "false_positive_rate": 0.1310165767924905,
+        "accuracy": 0.8610526315789474,
+        "average_precision": 0.8574859338096387,
+        "brier": 0.0675462075727492,
+        "ece": 0.056390960020986466
+      }
+    },
+    {
+      "name": "mobilenet-linear-class-1201",
+      "backbone": "mobilenet",
+      "head": "linear",
+      "balance": "class",
+      "seed": 1201,
+      "thresholds": [
+        0.4900902509689331,
+        0.43564149737358093,
+        0.005103584378957748,
+        0.010475692339241505,
+        0.015364836901426315
+      ],
+      "metrics": {
+        "tp": 966,
+        "fp": 656,
+        "tn": 4351,
+        "fn": 202,
+        "recall": 0.827054794520548,
+        "precision": 0.5955610357583231,
+        "false_positive_rate": 0.1310165767924905,
+        "accuracy": 0.8610526315789474,
+        "average_precision": 0.8574859338096387,
+        "brier": 0.0675462075727492,
+        "ece": 0.056390960020986466
+      }
+    },
+    {
+      "name": "mobilenet-linear-recording-731",
+      "backbone": "mobilenet",
+      "head": "linear",
+      "balance": "recording",
+      "seed": 731,
+      "thresholds": [
+        0.5805903077125549,
+        0.5469269752502441,
+        0.004334719385951757,
+        0.027321679517626762,
+        0.015757160261273384
+      ],
+      "metrics": {
+        "tp": 966,
+        "fp": 628,
+        "tn": 4379,
+        "fn": 202,
+        "recall": 0.827054794520548,
+        "precision": 0.6060225846925973,
+        "false_positive_rate": 0.12542440583183542,
+        "accuracy": 0.8655870445344129,
+        "average_precision": 0.8595639118690516,
+        "brier": 0.06693435483718872,
+        "ece": 0.055678789492924624
+      }
+    },
+    {
+      "name": "mobilenet-linear-recording-947",
+      "backbone": "mobilenet",
+      "head": "linear",
+      "balance": "recording",
+      "seed": 947,
+      "thresholds": [
+        0.5805903077125549,
+        0.5469269752502441,
+        0.004334719385951757,
+        0.027321679517626762,
+        0.015757160261273384
+      ],
+      "metrics": {
+        "tp": 966,
+        "fp": 628,
+        "tn": 4379,
+        "fn": 202,
+        "recall": 0.827054794520548,
+        "precision": 0.6060225846925973,
+        "false_positive_rate": 0.12542440583183542,
+        "accuracy": 0.8655870445344129,
+        "average_precision": 0.8595639118690516,
+        "brier": 0.06693435483718872,
+        "ece": 0.055678789492924624
+      }
+    },
+    {
+      "name": "mobilenet-linear-recording-1201",
+      "backbone": "mobilenet",
+      "head": "linear",
+      "balance": "recording",
+      "seed": 1201,
+      "thresholds": [
+        0.5805903077125549,
+        0.5469269752502441,
+        0.004334719385951757,
+        0.027321679517626762,
+        0.015757160261273384
+      ],
+      "metrics": {
+        "tp": 966,
+        "fp": 628,
+        "tn": 4379,
+        "fn": 202,
+        "recall": 0.827054794520548,
+        "precision": 0.6060225846925973,
+        "false_positive_rate": 0.12542440583183542,
+        "accuracy": 0.8655870445344129,
+        "average_precision": 0.8595639118690516,
+        "brier": 0.06693435483718872,
+        "ece": 0.055678789492924624
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-class-731",
+      "backbone": "mobilenet",
+      "head": "nonlinear",
+      "balance": "class",
+      "seed": 731,
+      "thresholds": [
+        0.7799599170684814,
+        0.6965784430503845,
+        0.3013631999492645,
+        0.22173506021499634,
+        0.20560501515865326
+      ],
+      "metrics": {
+        "tp": 968,
+        "fp": 546,
+        "tn": 4461,
+        "fn": 200,
+        "recall": 0.8287671232876712,
+        "precision": 0.6393659180977543,
+        "false_positive_rate": 0.10904733373277412,
+        "accuracy": 0.8791902834008097,
+        "average_precision": 0.8870269276326194,
+        "brier": 0.06377656978158354,
+        "ece": 0.04890628785548314
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-class-947",
+      "backbone": "mobilenet",
+      "head": "nonlinear",
+      "balance": "class",
+      "seed": 947,
+      "thresholds": [
+        0.7313004732131958,
+        0.7007064819335938,
+        0.26522591710090637,
+        0.25210368633270264,
+        0.2890268564224243
+      ],
+      "metrics": {
+        "tp": 977,
+        "fp": 582,
+        "tn": 4425,
+        "fn": 191,
+        "recall": 0.836472602739726,
+        "precision": 0.6266837716484926,
+        "false_positive_rate": 0.11623726782504494,
+        "accuracy": 0.8748178137651822,
+        "average_precision": 0.8865065298541757,
+        "brier": 0.06710581229737905,
+        "ece": 0.058146589261794286
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-class-1201",
+      "backbone": "mobilenet",
+      "head": "nonlinear",
+      "balance": "class",
+      "seed": 1201,
+      "thresholds": [
+        0.745733380317688,
+        0.741685152053833,
+        0.32987576723098755,
+        0.3200635015964508,
+        0.13969242572784424
+      ],
+      "metrics": {
+        "tp": 973,
+        "fp": 519,
+        "tn": 4488,
+        "fn": 195,
+        "recall": 0.8330479452054794,
+        "precision": 0.6521447721179625,
+        "false_positive_rate": 0.10365488316357101,
+        "accuracy": 0.8843724696356275,
+        "average_precision": 0.8906315097538757,
+        "brier": 0.06334000268979763,
+        "ece": 0.051097950005943124
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-recording-731",
+      "backbone": "mobilenet",
+      "head": "nonlinear",
+      "balance": "recording",
+      "seed": 731,
+      "thresholds": [
+        0.7798014283180237,
+        0.7073554992675781,
+        0.3219923675060272,
+        0.41868677735328674,
+        0.2072383463382721
+      ],
+      "metrics": {
+        "tp": 966,
+        "fp": 459,
+        "tn": 4548,
+        "fn": 202,
+        "recall": 0.827054794520548,
+        "precision": 0.6778947368421052,
+        "false_positive_rate": 0.09167165967645297,
+        "accuracy": 0.8929554655870445,
+        "average_precision": 0.8891722766074498,
+        "brier": 0.06405645936061972,
+        "ece": 0.055214664968047375
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-recording-947",
+      "backbone": "mobilenet",
+      "head": "nonlinear",
+      "balance": "recording",
+      "seed": 947,
+      "thresholds": [
+        0.7599585652351379,
+        0.7407504916191101,
+        0.3211256265640259,
+        0.5034358501434326,
+        0.2505982518196106
+      ],
+      "metrics": {
+        "tp": 967,
+        "fp": 473,
+        "tn": 4534,
+        "fn": 201,
+        "recall": 0.8279109589041096,
+        "precision": 0.6715277777777777,
+        "false_positive_rate": 0.09446774515678051,
+        "accuracy": 0.8908502024291498,
+        "average_precision": 0.8879663883380557,
+        "brier": 0.06790593058338437,
+        "ece": 0.06291094293510555
+      }
+    },
+    {
+      "name": "mobilenet-nonlinear-recording-1201",
+      "backbone": "mobilenet",
+      "head": "nonlinear",
+      "balance": "recording",
+      "seed": 1201,
+      "thresholds": [
+        0.8017259240150452,
+        0.7562113404273987,
+        0.3376241624355316,
+        0.4762330651283264,
+        0.18394972383975983
+      ],
+      "metrics": {
+        "tp": 967,
+        "fp": 468,
+        "tn": 4539,
+        "fn": 201,
+        "recall": 0.8279109589041096,
+        "precision": 0.6738675958188153,
+        "false_positive_rate": 0.09346914319952067,
+        "accuracy": 0.8916599190283401,
+        "average_precision": 0.8917356419235816,
+        "brier": 0.06510745257507053,
+        "ece": 0.05762682987444921
+      }
+    },
+    {
+      "name": "dinov2-linear-class-731",
+      "backbone": "dinov2",
+      "head": "linear",
+      "balance": "class",
+      "seed": 731,
+      "thresholds": [
+        0.43279168009757996,
+        0.7299901247024536,
+        0.14417408406734467,
+        0.03115197643637657,
+        0.04410215839743614
+      ],
+      "metrics": {
+        "tp": 1002,
+        "fp": 551,
+        "tn": 4456,
+        "fn": 166,
+        "recall": 0.8578767123287672,
+        "precision": 0.6452028332260141,
+        "false_positive_rate": 0.11004593569003396,
+        "accuracy": 0.8838866396761134,
+        "average_precision": 0.8726311507160668,
+        "brier": 0.06462540833498108,
+        "ece": 0.05345058046702347
+      }
+    },
+    {
+      "name": "dinov2-linear-class-947",
+      "backbone": "dinov2",
+      "head": "linear",
+      "balance": "class",
+      "seed": 947,
+      "thresholds": [
+        0.43279168009757996,
+        0.7299901247024536,
+        0.14417408406734467,
+        0.03115197643637657,
+        0.04410215839743614
+      ],
+      "metrics": {
+        "tp": 1002,
+        "fp": 551,
+        "tn": 4456,
+        "fn": 166,
+        "recall": 0.8578767123287672,
+        "precision": 0.6452028332260141,
+        "false_positive_rate": 0.11004593569003396,
+        "accuracy": 0.8838866396761134,
+        "average_precision": 0.8726311507160668,
+        "brier": 0.06462540833498108,
+        "ece": 0.05345058046702347
+      }
+    },
+    {
+      "name": "dinov2-linear-class-1201",
+      "backbone": "dinov2",
+      "head": "linear",
+      "balance": "class",
+      "seed": 1201,
+      "thresholds": [
+        0.43279168009757996,
+        0.7299901247024536,
+        0.14417408406734467,
+        0.03115197643637657,
+        0.04410215839743614
+      ],
+      "metrics": {
+        "tp": 1002,
+        "fp": 551,
+        "tn": 4456,
+        "fn": 166,
+        "recall": 0.8578767123287672,
+        "precision": 0.6452028332260141,
+        "false_positive_rate": 0.11004593569003396,
+        "accuracy": 0.8838866396761134,
+        "average_precision": 0.8726311507160668,
+        "brier": 0.06462540833498108,
+        "ece": 0.05345058046702347
+      }
+    },
+    {
+      "name": "dinov2-linear-recording-731",
+      "backbone": "dinov2",
+      "head": "linear",
+      "balance": "recording",
+      "seed": 731,
+      "thresholds": [
+        0.5266695618629456,
+        0.7714554071426392,
+        0.1752476692199707,
+        0.07119547575712204,
+        0.04629287123680115
+      ],
+      "metrics": {
+        "tp": 991,
+        "fp": 521,
+        "tn": 4486,
+        "fn": 177,
+        "recall": 0.848458904109589,
+        "precision": 0.6554232804232805,
+        "false_positive_rate": 0.10405432394647493,
+        "accuracy": 0.8869635627530364,
+        "average_precision": 0.877999362177315,
+        "brier": 0.0632789751968369,
+        "ece": 0.05120638636257071
+      }
+    },
+    {
+      "name": "dinov2-linear-recording-947",
+      "backbone": "dinov2",
+      "head": "linear",
+      "balance": "recording",
+      "seed": 947,
+      "thresholds": [
+        0.5266695618629456,
+        0.7714554071426392,
+        0.1752476692199707,
+        0.07119547575712204,
+        0.04629287123680115
+      ],
+      "metrics": {
+        "tp": 991,
+        "fp": 521,
+        "tn": 4486,
+        "fn": 177,
+        "recall": 0.848458904109589,
+        "precision": 0.6554232804232805,
+        "false_positive_rate": 0.10405432394647493,
+        "accuracy": 0.8869635627530364,
+        "average_precision": 0.877999362177315,
+        "brier": 0.0632789751968369,
+        "ece": 0.05120638636257071
+      }
+    },
+    {
+      "name": "dinov2-linear-recording-1201",
+      "backbone": "dinov2",
+      "head": "linear",
+      "balance": "recording",
+      "seed": 1201,
+      "thresholds": [
+        0.5266695618629456,
+        0.7714554071426392,
+        0.1752476692199707,
+        0.07119547575712204,
+        0.04629287123680115
+      ],
+      "metrics": {
+        "tp": 991,
+        "fp": 521,
+        "tn": 4486,
+        "fn": 177,
+        "recall": 0.848458904109589,
+        "precision": 0.6554232804232805,
+        "false_positive_rate": 0.10405432394647493,
+        "accuracy": 0.8869635627530364,
+        "average_precision": 0.877999362177315,
+        "brier": 0.0632789751968369,
+        "ece": 0.05120638636257071
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-class-731",
+      "backbone": "dinov2",
+      "head": "nonlinear",
+      "balance": "class",
+      "seed": 731,
+      "thresholds": [
+        0.5483026504516602,
+        0.7335995435714722,
+        0.5586370825767517,
+        0.6638904809951782,
+        0.2822554111480713
+      ],
+      "metrics": {
+        "tp": 954,
+        "fp": 483,
+        "tn": 4524,
+        "fn": 214,
+        "recall": 0.8167808219178082,
+        "precision": 0.6638830897703549,
+        "false_positive_rate": 0.09646494907130018,
+        "accuracy": 0.8871255060728745,
+        "average_precision": 0.8439159839069275,
+        "brier": 0.07834769685410659,
+        "ece": 0.060414294711656324
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-class-947",
+      "backbone": "dinov2",
+      "head": "nonlinear",
+      "balance": "class",
+      "seed": 947,
+      "thresholds": [
+        0.5754057765007019,
+        0.70586097240448,
+        0.5438739657402039,
+        0.6702168583869934,
+        0.32184645533561707
+      ],
+      "metrics": {
+        "tp": 943,
+        "fp": 451,
+        "tn": 4556,
+        "fn": 225,
+        "recall": 0.8073630136986302,
+        "precision": 0.6764705882352942,
+        "false_positive_rate": 0.09007389654483723,
+        "accuracy": 0.8905263157894737,
+        "average_precision": 0.8502647815336093,
+        "brier": 0.0770921689606658,
+        "ece": 0.060704400545246937
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-class-1201",
+      "backbone": "dinov2",
+      "head": "nonlinear",
+      "balance": "class",
+      "seed": 1201,
+      "thresholds": [
+        0.5718142986297607,
+        0.7284277677536011,
+        0.5679579973220825,
+        0.6810557246208191,
+        0.25946149230003357
+      ],
+      "metrics": {
+        "tp": 932,
+        "fp": 447,
+        "tn": 4560,
+        "fn": 236,
+        "recall": 0.797945205479452,
+        "precision": 0.6758520667150109,
+        "false_positive_rate": 0.08927501497902936,
+        "accuracy": 0.8893927125506073,
+        "average_precision": 0.8506542092034162,
+        "brier": 0.07661429645020376,
+        "ece": 0.060391845788252525
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-recording-731",
+      "backbone": "dinov2",
+      "head": "nonlinear",
+      "balance": "recording",
+      "seed": 731,
+      "thresholds": [
+        0.6471841335296631,
+        0.7498787045478821,
+        0.6666378378868103,
+        0.735107958316803,
+        0.3345282971858978
+      ],
+      "metrics": {
+        "tp": 941,
+        "fp": 437,
+        "tn": 4570,
+        "fn": 227,
+        "recall": 0.8056506849315068,
+        "precision": 0.6828737300435413,
+        "false_positive_rate": 0.08727781106450969,
+        "accuracy": 0.8924696356275303,
+        "average_precision": 0.8600316072217606,
+        "brier": 0.07930850547936909,
+        "ece": 0.06925192659648416
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-recording-947",
+      "backbone": "dinov2",
+      "head": "nonlinear",
+      "balance": "recording",
+      "seed": 947,
+      "thresholds": [
+        0.660068690776825,
+        0.7495070695877075,
+        0.6682668328285217,
+        0.7352797389030457,
+        0.3321552872657776
+      ],
+      "metrics": {
+        "tp": 938,
+        "fp": 417,
+        "tn": 4590,
+        "fn": 230,
+        "recall": 0.803082191780822,
+        "precision": 0.692250922509225,
+        "false_positive_rate": 0.08328340323547034,
+        "accuracy": 0.8952226720647773,
+        "average_precision": 0.8655995172103041,
+        "brier": 0.07756957885346392,
+        "ece": 0.06934402168157205
+      }
+    },
+    {
+      "name": "dinov2-nonlinear-recording-1201",
+      "backbone": "dinov2",
+      "head": "nonlinear",
+      "balance": "recording",
+      "seed": 1201,
+      "thresholds": [
+        0.6530497670173645,
+        0.7491776347160339,
+        0.6435889005661011,
+        0.7257681488990784,
+        0.28344297409057617
+      ],
+      "metrics": {
+        "tp": 938,
+        "fp": 417,
+        "tn": 4590,
+        "fn": 230,
+        "recall": 0.803082191780822,
+        "precision": 0.692250922509225,
+        "false_positive_rate": 0.08328340323547034,
+        "accuracy": 0.8952226720647773,
+        "average_precision": 0.8678015756566657,
+        "brier": 0.07646902803420734,
+        "ece": 0.06610975341483487
+      }
+    }
+  ]
+}
