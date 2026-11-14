@@ -38,6 +38,7 @@ class Frontend(BaseHTTPRequestHandler):
    self.send((self.server.static/'maintenance.html').read_bytes(),200,'text/html; charset=utf-8')
   else:self.send(json.dumps(dict(error=state.get('title','Request interrupted; please retry'),maintenance=not state.get('available',False))).encode(),503)
  def camera_frame(self):
+  # YouTube visibility is applied by broadcast_camera, never to local preview.
   # Bypass the analysis process entirely; recording publishes atomic JPEGs here.
   try:
    with self.server.preview.open('rb') as source:
