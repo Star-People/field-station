@@ -3,8 +3,6 @@ All feature extraction uses the native Vision path. Human labels are never chang
 """
 from collections import Counter,defaultdict
 import numpy as np
-import torch
-from torch import nn
 ARCHITECTURE='MobileNetV3 Small frozen RGB features + normalized 64-unit nonlinear human-reviewed classifier'
 THRESHOLD=.78
 
@@ -23,15 +21,17 @@ def sample_weights(rows):
         mask=np.array([r['label']==label for r in rows]);weights[mask]*=len(rows)/2/weights[mask].sum()
     return weights
 
-class ReviewedHead(nn.Module):
-    def __init__(self,mean,std,width=64):
-        super().__init__();self.register_buffer('mean',torch.as_tensor(mean,dtype=torch.float32));self.register_buffer('std',torch.as_tensor(std,dtype=torch.float32))
-        self.layers=nn.Sequential(nn.Linear(len(mean),width),nn.ReLU(),nn.Dropout(.25),nn.Linear(width,1))
-    def forward(self,x):
-        z=self.layers((x-self.mean)/self.std)
-        return torch.cat((z/2,-z/2),dim=1)
+def __getattr__(name):
+    if name=='ReviewedHead':
+        from human_head import ReviewedHead
+        return ReviewedHead
+    raise AttributeError(name)
+
 
 def fit_head(x,rows,classes,progress=None):
+    import torch
+    from torch import nn
+    from human_head import ReviewedHead
     if classes!=['anomalous','not_anomalous']:raise ValueError('Nonlinear human recipe requires the binary class order')
     if len(x)!=len(rows) or not all(r.get('human_confirmed') for r in rows):raise ValueError('Human-only native rows required')
     if {r['label'] for r in rows}!=set(classes):raise ValueError('Both reviewed classes required')

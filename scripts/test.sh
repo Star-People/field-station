@@ -101,3 +101,5 @@ PYTHONPATH="capture-station:${PYTHONPATH:-}" "$PYTHON" -m unittest discover -s c
 "$PYTHON" -m unittest discover -s training-backup -p 'test_*.py'
 
 PYTHONPATH="capture-station:${PYTHONPATH:-}" "$PYTHON" -m unittest test_youtube_sessions
+
+"$PYTHON" -m unittest discover -s model-research -p 'test_*.py'

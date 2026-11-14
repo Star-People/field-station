@@ -19,6 +19,9 @@ def train(folder):
     from threadpoolctl import threadpool_limits
     torch.set_num_threads(2);torch.set_num_interop_threads(1);torch.manual_seed(731);np.random.seed(731)
     dataset=json.loads((folder/'dataset.json').read_text());rows=dataset['samples'];classes=dataset['classes']
+    from prospective import partition
+    rows,research_admission=partition(folder.parent.parent,rows)
+    save(folder/'research-admission.json',research_admission)
     if dataset['blockers']:raise ValueError('Dataset has unresolved split blockers')
     machine_benchmark=machine_benchmark_training(dataset)
     for role in (['train'] if machine_benchmark else ['train','calibration','test']):
@@ -115,7 +118,7 @@ def train(folder):
         with Image.open(folder/row['image']) as im:im=im.convert('RGB').resize((224,224),Image.Resampling.BILINEAR)
         with torch.no_grad():original=candidate(transforms.ToTensor()(im).unsqueeze(0)).numpy()[0]
         output=model.predict({'image':im});scores=next(v for v in output.values() if isinstance(v,dict));parity.append(max(abs(float(original[i])-float(scores[label])) for i,label in enumerate(classes)))
-    report.update(dataset_fingerprint=dataset['fingerprint'],classes=classes,thresholds=thresholds,calibration=cal_evidence,export_max_absolute_error=max(parity,default=1),automatic_promotion=False,pipeline_qualified=False,feature_preprocessing='Vision/CoreML scaleFill native crops',limitations=['Crop-level evaluation only; native proposal recall, tracking and full-load throughput unqualified','Anomalous means similarity to reviewed examples, not proof of an unexplained event','Small or uncertain objects remain unknown and retain evidence'],versions=dict(torch=torch.__version__,torchvision=torchvision.__version__,coremltools=ct.__version__),resources=dict(cpu_threads=2,feature_batch=16,device='cpu'))
+    report.update(dataset_fingerprint=dataset['fingerprint'],classes=classes,thresholds=thresholds,calibration=cal_evidence,export_max_absolute_error=max(parity,default=1),automatic_promotion=False,pipeline_qualified=False,feature_preprocessing='Vision/CoreML scaleFill native crops',limitations=['Crop-level evaluation only; native proposal recall, tracking and full-load throughput unqualified','Anomalous means similarity to reviewed examples, not proof of an unexplained event','Binary decisions use the configured threshold; uncertain scores are not a third class'],versions=dict(torch=torch.__version__,torchvision=torchvision.__version__,coremltools=ct.__version__),resources=dict(cpu_threads=2,feature_batch=16,device='cpu'))
     save(folder/'evaluation.json',report)
     if report['export_max_absolute_error']>.025:raise ValueError('Core ML export parity failed')
     save(folder/'candidate-policy.json',dict(schema_version=1,version=dataset['fingerprint'],classes=classes,thresholds=thresholds,minimum_native_size=8,input_color_space='RGB',preprocessing='Vision scaleFill full-color RGB crop; ImageNet channel normalization',role='review_suggestions_only',automatic_promotion=False,classification_input_scope='review_box',training_recipe=strategy,architecture=ARCHITECTURE if strategy=='human_nonlinear_v1' else 'MobileNetV3 Small + trained linear classifier'))

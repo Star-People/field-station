@@ -9,6 +9,20 @@ def read(p,default=None):
  try:return json.loads(p.read_text())
  except FileNotFoundError:return default
 
+def capture_metadata(lab,review):
+ """Use the source clock, never the time a human clicked a review button."""
+ import math,re
+ out={k:review[k] for k in ('event_id','generation','pts_seconds','reviewed_epoch') if k in review}
+ event_id=review.get('event_id','')
+ if not re.fullmatch('[a-f0-9]{32}',event_id):return out
+ event=read(Path(lab).parent/'notifications/outbox'/event_id/'event.json',{})
+ if not review.get('generation') or review.get('generation')!=event.get('generation'):return out
+ values=[event.get('detected_epoch'),review.get('pts_seconds'),event.get('pts_seconds')]
+ if not all(isinstance(v,(int,float)) and math.isfinite(v) for v in values):return out
+ captured=values[0]+values[1]-values[2]
+ if captured>0:out.update(captured_epoch=captured,capture_provenance='event_clock_plus_same_generation_pts')
+ return out
+
 def collect(lab):
  lab=Path(lab);rows=[];images={};omitted=read(lab/'omitted-videos.json',{})
  def add(path,label,group,origin,original_label=None,prepared=None):
@@ -23,7 +37,9 @@ def collect(lab):
    width,height=im.size;digest=hashlib.sha256(f'{width}x{height}:RGB:'.encode()+im.tobytes()).hexdigest();out=io.BytesIO();im.save(out,format='PNG');png=out.getvalue()
   name='images/'+hashlib.sha256(origin.encode()).hexdigest()+'.png';images[name]=png
   rows.append(dict(origin=origin,label=label,original_label=original_label,group=group,pixel_sha256=digest,native_width=width,native_height=height,image=name))
-  if prepared:rows[-1].update(input_color_space=prepared.get('input_color_space','legacy_grayscale'),color_provenance=prepared.get('color_provenance','original'))
+  if prepared:
+   rows[-1].update(input_color_space=prepared.get('input_color_space','legacy_grayscale'),color_provenance=prepared.get('color_provenance','original'))
+   rows[-1].update(capture_metadata(lab,prepared.get('review',{})))
   else:rows[-1].update(input_color_space='RGB',color_provenance='video_annotation')
  for r in reviewed_examples(lab,workers=4,prepared=True):add(r['image'],r['label'],r['group'],'email:'+r['id'],r['review'].get('original_label',r['label']),prepared=r)
  for folder in sorted((lab/'videos').iterdir()):

@@ -57,6 +57,8 @@ def build(base,reviews,out,ledger,progress=None):
    if digest!=row['pixel_sha256']:raise ValueError('Training image checksum changed')
    group=aliases.get(row['group'],row['group']);fixed=row['split'] if is_base else 'train'
    rows.append(dict(row,source=str(path),group=group,fixed_split=fixed,human_confirmed=not is_base))
+ from prospective import partition
+ rows,research_admission=partition(ledger.parent,rows)
  rows,quarantine=reviewed_training_groups(rows);coverage,validation_limits=assign_splits(rows)
  # Coverage limits affect validation claims, never admission to training.
  blockers=[f'Missing {role} split' for role in ('train','calibration','test') if not any(r['split']==role for r in rows)]
@@ -74,5 +76,6 @@ def build(base,reviews,out,ledger,progress=None):
  ledger.parent.mkdir(parents=True,exist_ok=True);temp=ledger.with_suffix('.tmp');temp.write_text(json.dumps(frozen));temp.replace(ledger)
  fingerprint=hashlib.sha256(json.dumps(samples,sort_keys=True).encode()).hexdigest()
  result=dict(schema_version=1,fingerprint=fingerprint,review_fingerprint=current['fingerprint'],baseline_fingerprint=original['fingerprint'],classes=sorted({r['label'] for r in samples}),samples=samples,counts=dict(Counter(r['label'] for r in samples)),independent_groups=coverage,blockers=blockers,quarantine=quarantine,deferred=deferred,validation_limits=validation_limits,human_training_counts=dict(Counter(r['label'] for r in samples if r['human_confirmed'])),review_policy='All current human-confirmed frames train; overlapping baseline groups are removed from holdout')
+ result['research_admission']=research_admission
  result['human_training_color_counts']=dict(Counter(r.get('input_color_space','unspecified') for r in samples if r['human_confirmed']))
  (out/'dataset.json').write_text(json.dumps(result));return result

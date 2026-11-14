@@ -1,4 +1,4 @@
-import unittest
+import unittest,importlib.util
 import numpy as np
 from human_nonlinear import select_rows,sample_weights,fit_head
 
@@ -11,6 +11,7 @@ class HumanRecipeTests(unittest.TestCase):
  def test_class_budgets_and_tempered_recording_influence(self):
   rows=[self.row('anomalous','a')]+[self.row('not_anomalous',str(i),'long') for i in range(100)]+[self.row('not_anomalous','short','short')]
   w=sample_weights(rows);self.assertAlmostEqual(w[0],sum(w[1:]));self.assertAlmostEqual(sum(w[1:101])/w[-1],10)
+ @unittest.skipUnless(importlib.util.find_spec('torch'), 'Neural fitting runs in the dedicated ML CI job')
  def test_binary_head_learns_and_rejects_machine_rows(self):
   import torch
   torch.set_num_threads(2)

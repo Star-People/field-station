@@ -89,18 +89,20 @@ def run(c):
    raw=subprocess.run(['/usr/bin/python3',c['ssh_helper'],command],capture_output=True,check=True,timeout=120).stdout
    if len(raw)>210*1024**2:raise ValueError('Native crop batch exceeds limit')
    from crop_client import CropClassifier
-   from binary_decision import decide
-   from night_context import enabled
+   from live_decisions import label as review_label, INPUT_CONTRACT
+   from color_decision import apply as color_apply
+   from model_settings import effective
    tools=human_root/'tools';shadow=Path(state.get('shadow_folder',str(teacher)));shadow_policy=read(shadow/'candidate-policy.json');models=[('human',human,read(human/'candidate-policy.json')),('hybrid',shadow,shadow_policy)]
+   settings=read(human_root.parent/'model-comparisons/model-settings.json',{})
+   models=[(lane,folder,effective(p,'human' if lane=='human' else ('machine' if machine else 'hybrid'),settings)) for lane,folder,p in models]
    batch=[]
    with tarfile.open(fileobj=io.BytesIO(raw)) as tar:
     for row in json.load(tar.extractfile('samples.json')):
      image_raw=tar.extractfile(row['id']+'.png').read()
      if hashlib.sha256(image_raw).hexdigest()!=row['sha256']:raise ValueError('Native crop transfer checksum mismatch')
-     image=Image.open(io.BytesIO(image_raw)).convert('RGB');x,y,w,h=row['detection_bounds'];bx,by,bw,bh=row['bounds']
-     if x<bx or y<by or x+w>bx+bw or y+h>by+bh:continue
-     tight=png(image.crop((x-bx,y-by,x-bx+w,y-by+h)))
-     batch.append((row,image_raw,tight,[png(image),png(image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)),png(ImageEnhance.Contrast(image).enhance(1.1))]))
+     image=Image.open(io.BytesIO(image_raw)).convert('RGB')
+     # The primary prediction uses the complete human-visible review box.
+     batch.append((row,image_raw,[png(image),png(image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)),png(ImageEnhance.Contrast(image).enhance(1.1))]))
    predictions={}
    for lane,folder,p in models:
     if lane=='hybrid' and p['version']==models[0][2]['version']:
@@ -109,18 +111,17 @@ def run(c):
     if not compiled.exists():subprocess.run([str(tools/'compile_model'),str(folder/'candidate.mlpackage'),str(compiled)],check=True,capture_output=True,timeout=300)
     with CropClassifier(tools/'crop_worker',compiled,p['version'],timeout=120) as classifier:
      values=[]
-     for start in range(0,len(batch),32):values.extend(classifier.predict([image for _,_,tight,views in batch[start:start+32] for image in [tight,*views]]))
+     for start in range(0,len(batch),32):values.extend(classifier.predict([image for _,_,views in batch[start:start+32] for image in views]))
     if any(r.get('error') for r in values):raise ValueError('Shadow inference failed')
-    predictions[lane]=[values[i:i+4] for i in range(0,len(values),4)]
-   for i,(row,raw,tight,views) in enumerate(batch):
+    predictions[lane]=[values[i:i+3] for i in range(0,len(values),3)]
+   for i,(row,raw,views) in enumerate(batch):
     labels={}
     for lane,folder,p in models:
-     values=predictions[lane][i];label=decide(values[0]['scores'],p['thresholds']['anomalous'],max(row['detection_bounds'][2:])>=p['minimum_native_size'])
-     if enabled(p,row['captured_epoch']) and values[1]['scores']['anomalous']<p['night_context_confirmation']['minimum_context_score']:label='not_anomalous'
+     values=predictions[lane][i];label=review_label(color_apply(values[0],raw,p),p)
      labels[lane]=label
-    pairs[row['id']]=dict(id=row['id'],scored_epoch=time.time(),generation=row['generation'],captured_epoch=row['captured_epoch'],human=labels['human'],hybrid=labels['hybrid'],human_version=version,hybrid_version=shadow_policy['version'],prospective=not state.get('shadow_seed_only') and row['captured_epoch']>max(human_state.get('deployed_epoch',time.time()),state.get('trained_epoch',time.time())),truth=None)
-    proposed=pseudo_label([v['scores'] for v in predictions['human'][i][1:]])
-    student=pseudo_label([v['scores'] for v in predictions['hybrid'][i][1:]])
+    pairs[row['id']]=dict(input_contract=INPUT_CONTRACT,settings_revisions={lane:p.get('settings_revision',0) for lane,folder,p in models},id=row['id'],scored_epoch=time.time(),generation=row['generation'],captured_epoch=row['captured_epoch'],human=labels['human'],hybrid=labels['hybrid'],human_version=version,hybrid_version=shadow_policy['version'],prospective=not state.get('shadow_seed_only') and row['captured_epoch']>max(human_state.get('deployed_epoch',time.time()),state.get('trained_epoch',time.time())),truth=None)
+    proposed=pseudo_label([v['scores'] for v in predictions['human'][i]])
+    student=pseudo_label([v['scores'] for v in predictions['hybrid'][i]])
     if machine:proposed=student
     if proposed is None or (not machine and (proposed!=student or row['pixel_sha256'] in human_pixels)):continue
     (root/'frames'/(row['id']+'.png')).write_bytes(raw);pool[row['id']]=dict(row,label=proposed,teacher_version=shadow_policy['version'] if machine else version,label_source='machine',admitted_epoch=time.time())
@@ -134,7 +135,9 @@ def run(c):
   if len(pairs)>20000:
    pending=sorted(((k,v) for k,v in pairs.items() if v.get('truth') is None),key=lambda kv:kv[1]['captured_epoch'],reverse=True)[:20000]
    pairs={**{k:v for k,v in pairs.items() if v.get('truth') is not None},**dict(pending)}
-  save(root/'pseudo-labels.json',pool);save(root/'comparisons.json',pairs);save(root/'metrics.json',dict(score([r for r in pairs.values() if r['human_version']==version and r['hybrid_version']==state['shadow_version']]),human_version=version,hybrid_version=state['shadow_version'],updated_epoch=time.time()))
+  settings_doc=read(human_root.parent/'model-comparisons/model-settings.json',{})
+  revisions={lane:settings_doc.get('models',{}).get(setting_lane+':'+v,{}).get('revision',0) for lane,setting_lane,v in [('human','human',version),('hybrid','machine' if machine else 'hybrid',state['shadow_version'])]}
+  save(root/'pseudo-labels.json',pool);save(root/'comparisons.json',pairs);save(root/'metrics.json',dict(score([r for r in pairs.values() if r.get('input_contract')=='review-box-v1' and r.get('settings_revisions')==revisions and r['human_version']==version and r['hybrid_version']==state['shadow_version']]),human_version=version,hybrid_version=state['shadow_version'],settings_revisions=revisions,updated_epoch=time.time()))
   try:
    from comparison import publish as publish_comparison
    if not machine:publish_comparison(root,c['ssh_helper'])
@@ -172,6 +175,10 @@ def run(c):
    image='images/pseudo-'+row['id']+'.png';os.link(root/'frames'/(row['id']+'.png'),folder/image)
    built['samples'].append(dict(origin='pseudo:'+row['id'],label=row['label'],group='machine:'+row['generation'],pixel_sha256=row['pixel_sha256'],native_width=row['native_width'],native_height=row['native_height'],image=image,split='train',human_confirmed=False,pseudo_label=True,input_color_space='RGB'))
   from collections import Counter
+  from decision_tuning import training_filter
+  allowed=training_filter(root);built['samples']=[r for r in built['samples'] if allowed(r)]
+  from prospective import partition
+  built['samples'],built['research_admission']=partition(root,built['samples'])
   built['counts']=dict(Counter(r['label'] for r in built['samples']))
   built.update(training_lane='hybrid',fingerprint=key,training_strategy='recording_balanced',shadow_only=True,pseudo_labels=len(pseudo),human_baseline_version=version);save(folder/'dataset.json',built)
   finish_training(root,folder,code,human_root,state)

@@ -20,6 +20,9 @@ def enabled(policy,epoch):
 
 def predict(worker,images,contexts,policy,request_id):
  results=worker.predict(images,request_id)
+ from color_decision import apply as apply_color
+ if len(results)!=len(images):raise ValueError('Incomplete crop predictions')
+ if policy.get('color_decision',{}).get('color_evidence'):results=[apply_color(r,raw,policy) for r,raw in zip(results,images)]
  if not contexts:return results
  if len(contexts)!=len(images) or len(results)!=len(images):raise ValueError('Night context crop mapping mismatch')
  rule=policy['night_context_confirmation'];floor=rule['minimum_context_score']
