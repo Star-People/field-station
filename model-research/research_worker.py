@@ -29,7 +29,7 @@ def collect_holdout(state):
   with Image.open(source) as image:
    image=image.convert('RGB');pixel=hashlib.sha256(f'{image.width}x{image.height}:RGB:'.encode()+image.tobytes()).hexdigest()
   if pixel!=row['pixel_sha256']:raise ValueError('Reserved image checksum mismatch')
-  name=hashlib.sha256(row['origin'].encode()).hexdigest()+'.png';target=images/name
+  name=hashlib.sha256((row['origin']+':'+row['pixel_sha256']).encode()).hexdigest()+'.png';target=images/name
   if not target.exists():shutil.copyfile(source,target)
   samples.append(dict(row,image='images/'+name))
  enrich_capture_times(samples)
@@ -125,6 +125,24 @@ print(json.dumps(dict(cursor=cursor,minutes=list(minutes.values()),tracks=list(t
  finally:db.close()
  state.update(cursor=result['cursor'],observed_camera_hours=seconds/3600,observed_frames=frames,proposal_observations=proposals,observed_tracks=tracks,telemetry_updated_epoch=time.time(),false_alerts_per_camera_hour=None,event_recall=None,event_metrics_reason='Independent event truth and completeness of missed-event audit are not established',temporal_control=False)
 
+def backup_research(state):
+ registry=ROOT/'prospective.sqlite';manifest=ROOT/'holdout/manifest.json';signature=[registry.stat().st_mtime_ns,manifest.stat().st_mtime_ns]
+ if state.get('backup_signature')==signature:return
+ volume=Path('/Volumes/UFO-Training')
+ if not volume.is_mount():raise ValueError('Separate research backup SSD unavailable')
+ destination=volume/'model-research-backup';destination.mkdir(exist_ok=True)
+ pending=destination/'prospective.pending.sqlite'
+ with sqlite3.connect(registry) as source,sqlite3.connect(pending) as target:source.backup(target)
+ pending.replace(destination/'prospective.sqlite')
+ (destination/'holdout/images').mkdir(parents=True,exist_ok=True)
+ for source in (ROOT/'holdout/images').glob('*.png'):
+  target=destination/'holdout/images'/source.name
+  if not target.exists():
+   temp=target.with_suffix('.pending');shutil.copyfile(source,temp);temp.replace(target)
+ for source,target in [(manifest,destination/'holdout/manifest.json'),(ROOT/'research-protocol.json',destination/'research-protocol.json'),(ROOT/'frozen-comparison.json',destination/'frozen-comparison.json')]:
+  temp=target.with_suffix('.pending');shutil.copyfile(source,temp);temp.replace(target)
+ state.update(backup_signature=signature,backup_epoch=time.time(),backup_error=None)
+
 def main():
  if not Path('/Volumes/UFO-Work').is_mount():raise ValueError('External research volume unavailable')
  with (ROOT/'worker.lock').open('a') as lock:
@@ -139,7 +157,7 @@ def main():
   try:
    collect_holdout(state)
    state['confirmatory_state']=read(ROOT/'confirmatory-summary.json',{'state':'collecting'})['state']
-   telemetry(state);state.update(phase='observing',error=None,updated_epoch=time.time())
+   telemetry(state);backup_research(state);state.update(phase='observing',error=None,updated_epoch=time.time())
   except Exception as exc:state.update(phase='retrying',error=str(exc),updated_epoch=time.time())
   save(ROOT/'status.json',state)
   print(json.dumps({k:v for k,v in state.items() if k!='cursor'}),flush=True)
