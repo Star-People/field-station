@@ -68,7 +68,7 @@ class OverlayPipe:
   self.camera=camera;self.rf_path=Path(rf_path);self.preview_url=preview_url;self.stop=threading.Event();self.renderer=SpectrumOverlay();self.frame=self.compose(self.renderer.render({}),True).tobytes();self.reader,self.writer=os.pipe()
  def compose(self,rf,standby=False,frame=None):
   canvas=Image.new('RGBA',(OUTPUT_WIDTH,OUTPUT_HEIGHT))
-  self.watermark.draw(canvas,frame,standby)
+  self.watermark.draw(canvas,frame,standby,location_ink=(155,201,140,255) if standby else ((17,17,17,255) if self.renderer.bright else (255,255,255,255)))
   self.tag_renderer.draw(canvas,self.tags,time.time(),standby)
   if standby:ImageDraw.Draw(canvas).rectangle((OUTPUT_WIDTH-RIGHT-WIDTH-10,OUTPUT_HEIGHT-BOTTOM-HEIGHT-10,OUTPUT_WIDTH-RIGHT+10,OUTPUT_HEIGHT-BOTTOM+10),fill=(8,19,13,242),outline=(155,201,140,255),width=1)
   canvas.alpha_composite(rf,(OUTPUT_WIDTH-RIGHT-WIDTH,OUTPUT_HEIGHT-BOTTOM-HEIGHT))

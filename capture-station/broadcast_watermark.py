@@ -5,6 +5,8 @@ from broadcast_rf import FONT
 
 class Watermark:
     def __init__(self):
+        from broadcast_location import LocationOverlay
+        self.location=LocationOverlay()
         path=Path(__file__).with_name('assets')/'field-station-mark.jpg'
         # Composite the supplied white-on-black mark as luminance coverage.
         # Retain its original pixels and trim only the shared preview's margins.
@@ -17,7 +19,8 @@ class Watermark:
         brand_font=Path('/System/Library/Fonts/SFNSRounded.ttf')
         self.font=ImageFont.truetype(str(brand_font if brand_font.is_file() else FONT),18)
 
-    def draw(self,canvas,frame=None,standby=False):
+    def draw(self,canvas,frame=None,standby=False,location_ink=None):
+        self.location.draw(canvas,frame,standby,ink=location_ink)
         bright=False
         if frame is not None and not standby:
             crop=frame.resize((1280,720)).convert('L').crop((30,26,285,74)).resize((16,4))

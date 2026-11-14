@@ -303,6 +303,11 @@ class Station:
             if motion_event:
                 m['duration_limit_seconds']=7200
                 m['pre_roll_actual_seconds']=max(0,onset-actual)
+            import sys
+            sys.path.insert(0,str(ROOT.parent/'uap-lab'))
+            from station_location import location_at
+            m['observation_location']=location_at(DATA.parent,m['started_epoch'])
+            m['location_scope']='session_start'
             self.active = m
             m['capture_origin'] = 'rf_trigger' if trigger_event else 'motion_trigger' if motion_event else 'validation' if validation else 'scheduled' if automatic else 'manual'
             if trigger_event:

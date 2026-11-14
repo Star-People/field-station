@@ -49,6 +49,9 @@ class Handler(BaseHTTPRequestHandler):
                     raw=gzip.compress(json.dumps(value).encode(),compresslevel=1);self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Encoding','gzip');self.send_header('Content-Length',str(len(raw)));self.send_header('Cache-Control','no-store');self.end_headers();self.wfile.write(raw)
                 else:self.json(value)
                 return
+            if p=='/api/location':
+                from station_location import location_at,display_label
+                place=location_at(lab.DATA.parent);self.json(dict(place,label=display_label(place)));return
             if p=='/api/settings':
                 from station_settings import settings
                 self.json(settings(lab.DATA.parent));return
