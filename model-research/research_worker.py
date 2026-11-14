@@ -19,8 +19,8 @@ def collect_holdout(state):
  paths=list(Path('/Volumes/UFO-Work/field/auto-training/reviews').glob('*/reviews.json'))
  if not paths:return
  path=max(paths,key=lambda p:p.stat().st_mtime);manifest=read(path,{})
- if state.get('snapshot')==manifest.get('fingerprint'):return
- _,admission=partition(ROOT,manifest['samples']);reserved={r['origin'] for r in admission['excluded'] if r['role']=='holdout'};samples=[]
+ if state.get('snapshot')==manifest.get('fingerprint') and state.get('registry_processed_mtime')==(ROOT/'prospective.sqlite').stat().st_mtime_ns:return
+ _,admission=partition(ROOT,manifest['samples']);reserved={r['origin']:r for r in admission['excluded'] if r['role']=='holdout'};samples=[]
  images=ROOT/'holdout/images';images.mkdir(parents=True,exist_ok=True)
  for row in manifest['samples']:
   if row['origin'] not in reserved:continue
@@ -31,10 +31,10 @@ def collect_holdout(state):
   if pixel!=row['pixel_sha256']:raise ValueError('Reserved image checksum mismatch')
   name=hashlib.sha256((row['origin']+':'+row['pixel_sha256']).encode()).hexdigest()+'.png';target=images/name
   if not target.exists():shutil.copyfile(source,target)
-  samples.append(dict(row,image='images/'+name))
+  samples.append(dict(row,original_group=row['group'],group=reserved[row['origin']]['component_group'],image='images/'+name))
  enrich_capture_times(samples)
  save(ROOT/'holdout/manifest.json',dict(protocol=admission['protocol'],snapshot=manifest['fingerprint'],samples=samples,updated_epoch=time.time(),evaluation_status='awaiting_preregistered_model_comparison' if samples else 'awaiting_new_independent_recordings'))
- state.update(snapshot=manifest['fingerprint'],reserved_reviewed_images=len(samples),reserved_recordings=len({r['group'] for r in samples}))
+ state.update(registry_processed_mtime=(ROOT/'prospective.sqlite').stat().st_mtime_ns,snapshot=manifest['fingerprint'],reserved_reviewed_images=len(samples),reserved_recordings=len({r['group'] for r in samples}))
 
 def enrich_capture_times(samples):
  if not samples:return

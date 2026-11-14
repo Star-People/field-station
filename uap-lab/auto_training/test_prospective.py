@@ -20,6 +20,8 @@ class Holdout(unittest.TestCase):
  def test_protocol_cannot_silently_change(self):
   self.cfg['holdout_percent']=0;(self.root/'research-protocol.json').write_text(json.dumps(self.cfg))
   with self.assertRaisesRegex(ValueError,'protocol changed'):partition(self.root,[])
+ def test_duplicate_linked_recordings_share_uncertainty_group(self):
+  _,audit=partition(self.root,[self.row('first','shared'),self.row('second','shared')]);self.assertEqual(audit['excluded'][0]['component_group'],audit['excluded'][1]['component_group'])
  def test_missing_registry_blocks(self):
   (self.root/'registry.sqlite').unlink()
   with self.assertRaisesRegex(ValueError,'missing'):partition(self.root,[])
