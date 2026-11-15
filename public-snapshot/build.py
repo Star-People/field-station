@@ -7,6 +7,13 @@ from export_field import clean
 
 def write(path,data):
  path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(data,separators=(',',':'),allow_nan=False))
+def version_assets(raw,out):
+ def replace(match):
+  path=out/match[2].lstrip('/')
+  if not path.is_file():return match[0]
+  return match[1]+match[2]+'?snapshot='+hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+ return re.sub(r"((?:src|href)=[\"'])(/[^\"'?#]+\.(?:js|css))(?:\?[^\"']*)?",replace,raw)
+
 def build(source,out,training):
  training=training.resolve();import fcntl
  pin=(training/'backup-read.lock').open('a');fcntl.flock(pin,fcntl.LOCK_SH)
@@ -16,6 +23,13 @@ def build(source,out,training):
   rel=p.relative_to(source)
   if p.is_file() and rel.parts[0] not in ('pages','responses') and p.suffix in ('.js','.css','.woff2','.png','.jpg','.webp','.svg','.txt'):
    dest=out/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(p,dest)
+ shell=out/'app-shell.js';js=shell.read_text()
+ hash_marker="function showModelStatus(hash,state){"
+ pip_marker="function renderBadge(){"
+ if hash_marker not in js or pip_marker not in js:raise ValueError('Snapshot UI status contract changed')
+ js=js.replace(hash_marker,hash_marker+"if(window.FIELD_PUBLIC_SNAPSHOT){if(hash)confirmedModelHash=hash;modelHash.textContent=(confirmedModelHash?confirmedModelHash.slice(0,12):'Model unavailable')+' · at snapshot';modelHash.title='Last confirmed model reported in this saved snapshot.';return;}",1)
+ js=js.replace(pip_marker,pip_marker+"if(window.FIELD_PUBLIC_SNAPSHOT){badge.textContent='Snapshot';badge.dataset.state='snapshot';return;}",1)
+ shell.write_text(js)
  shutil.copy2(Path(__file__).with_name('snapshot.js'),out/'snapshot.js')
  for name in ('LICENSE','LICENSE-CONTENT.txt','CONTENT-LICENSE.md','NOTICE.md','THIRD_PARTY_NOTICES.md'):
   license_file=Path(__file__).parent.parent/name
@@ -23,7 +37,7 @@ def build(source,out,training):
  for name in ('public-readonly.js','public-readonly.css'):shutil.copy2(Path(__file__).parent.parent/'public-access'/name,out/name)
  for p in (source/'pages').glob('*.html'):
   raw=p.read_text().replace('<head>','<head><script src="/snapshot.js"></script>',1)
-  raw=raw.replace('<head><meta','<head><meta')
+  raw=version_assets(raw,out)
   dest=out/'index.html' if p.stem=='index' else out/p.stem/'index.html';dest.parent.mkdir(exist_ok=True);dest.write_text(raw)
  rows=json.loads((source/'objects.json').read_text());rows.sort(key=lambda r:(r.get('created',0),r['id']),reverse=True)
  annotation_cache={};cache_lock=__import__('threading').Lock()
