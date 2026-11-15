@@ -20,7 +20,11 @@ def capture_metadata(lab,review):
  values=[event.get('detected_epoch'),review.get('pts_seconds'),event.get('pts_seconds')]
  if not all(isinstance(v,(int,float)) and math.isfinite(v) for v in values):return out
  captured=values[0]+values[1]-values[2]
- if captured>0:out.update(captured_epoch=captured,capture_provenance='event_clock_plus_same_generation_pts')
+ if captured>0:
+  from station_location import location_at
+  out.update(captured_epoch=captured,capture_provenance='event_clock_plus_same_generation_pts')
+  location=location_at(Path(lab).parent,captured)
+  if location['status']=='known':out['observation_location']=location
  return out
 
 def collect(lab):

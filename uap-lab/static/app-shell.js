@@ -194,12 +194,33 @@
  const nav=document.getElementById('mainNav');if(!nav)return;
  const open=document.createElement('button');open.type='button';open.id='stationSettingsOpen';open.textContent='Settings';nav.append(open);
  const dialog=document.createElement('dialog');dialog.id='stationSettings';dialog.setAttribute('aria-labelledby','stationSettingsTitle');
- dialog.innerHTML='<form method="dialog" class="settings-heading"><h2 id="stationSettingsTitle">Settings</h2><button aria-label="Close settings" value="close">×</button></form><label class="settings-option" for="daytimeAutoCleanup"><span>Daytime auto-cleanup</span><input id="daytimeAutoCleanup" type="checkbox" role="switch" disabled></label><label class="settings-option settings-delay" for="daytimeCleanupDelay"><span>Delete after</span><select id="daytimeCleanupDelay" disabled><option value="10800">3 hours</option><option value="21600">6 hours</option><option value="43200">12 hours</option><option value="86400">24 hours</option></select></label><p id="daytimeCleanupHelp">Delete machine-only, non-anomalous daytime detections after the selected time from capture. Runs during daylight; nighttime detections, human-reviewed training data, starred evidence, and manual recordings are kept.</p><p id="stationSettingsStatus" role="status"></p>';
+ dialog.innerHTML='<form method="dialog" class="settings-heading"><h2 id="stationSettingsTitle">Settings</h2><button aria-label="Close settings" value="close">×</button></form><label class="settings-option" for="daytimeAutoCleanup"><span>Daytime auto-cleanup</span><input id="daytimeAutoCleanup" type="checkbox" role="switch" disabled></label><label class="settings-option settings-delay" for="daytimeCleanupDelay"><span>Delete after</span><select id="daytimeCleanupDelay" disabled><option value="10800">3 hours</option><option value="21600">6 hours</option><option value="43200">12 hours</option><option value="86400">24 hours</option></select></label><p id="daytimeCleanupHelp">Delete machine-only, non-anomalous daytime detections after the selected time from capture. Runs during daylight; nighttime detections, human-reviewed training data, starred evidence, and manual recordings are kept.</p><p id="stationLocation">Automatic location: unknown</p><p id="stationSettingsStatus" role="status"></p>';
  document.body.append(dialog);const toggle=dialog.querySelector('input'),delay=dialog.querySelector('select'),status=dialog.querySelector('[role=status]');toggle.setAttribute('aria-describedby','daytimeCleanupHelp');delay.setAttribute('aria-describedby','daytimeCleanupHelp');let confirmed={daytime_auto_cleanup:false,after_seconds:10800},busy=false;
- function render(state){confirmed=state;toggle.checked=state.daytime_auto_cleanup===true;delay.value=String(state.after_seconds);toggle.disabled=busy;delay.disabled=busy||!toggle.checked;}
+ function render(state){const place=state.observation_location;dialog.querySelector('#stationLocation').textContent=place?.status==='known'?'Location: '+[place.county,place.state,place.country].join(', ')+' · automatic, county only':'Automatic location: unknown';confirmed=state;toggle.checked=state.daytime_auto_cleanup===true;delay.value=String(state.after_seconds);toggle.disabled=busy;delay.disabled=busy||!toggle.checked;}
  async function load(){toggle.disabled=true;delay.disabled=true;status.textContent='Loading…';try{const r=await fetch('/api/settings',{cache:'no-store',signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error();const state=await r.json();render(state);status.textContent='';}catch{status.textContent='Settings unavailable. Close and reopen to retry.';}}
  open.onclick=()=>{nav.hidden=true;document.getElementById('menuToggle').setAttribute('aria-expanded','false');dialog.showModal();void load();};
  dialog.addEventListener('close',()=>document.getElementById('menuToggle').focus());
  const saveSettings=async()=>{if(busy)return;const requested={daytime_auto_cleanup:toggle.checked,after_seconds:Number(delay.value)};busy=true;toggle.disabled=true;delay.disabled=true;status.textContent='Saving…';try{const auth=await fetch('/api/labeled-frames/token',{cache:'no-store',signal:AbortSignal.timeout(10000)});if(!auth.ok)throw Error();const {token}=await auth.json();const response=await fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json','X-Lab-Token':token},body:JSON.stringify(requested),signal:AbortSignal.timeout(10000)});if(!response.ok)throw Error();const state=await response.json();render(state);status.textContent='Saved';}catch{render(confirmed);status.textContent='Save could not be confirmed. Reopen settings to check.';}finally{busy=false;render(confirmed);}};
  toggle.onchange=saveSettings;delay.onchange=saveSettings;
+})();
+
+// The station's coarse location, never the reviewing device's location.
+(()=>{
+ const viewer=document.getElementById('liveViewer');if(!viewer)return;
+ const label=document.createElement('span');label.id='cameraLocation';label.className='camera-location';label.hidden=true;viewer.append(label);
+ const rf=document.getElementById('rfOverlay');
+ if(rf){const syncInk=()=>{const ink=rf.style.color||'#fff';if(label.style.color!==ink)label.style.color=ink;};new MutationObserver(syncInk).observe(rf,{attributes:true,attributeFilter:['style']});syncInk();}
+ let timer,busy=false;
+ async function refresh(){
+  if(busy)return;busy=true;clearTimeout(timer);
+  try{
+   const response=await fetch('/api/location',{cache:'no-store',signal:AbortSignal.timeout(5000)});
+   if(!response.ok)throw Error();const place=await response.json();
+   const text=place.status==='known'&&typeof place.label==='string'?place.label:'';
+   if(label.textContent!==text)label.textContent=text;label.hidden=!text;
+  }catch{label.hidden=true;label.textContent='';}
+  finally{busy=false;timer=setTimeout(refresh,30000);}
+ }
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
+ void refresh();
 })();

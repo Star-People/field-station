@@ -8,7 +8,8 @@ def settings(root):
  value=read(Path(root)/'station-settings.json',{})
  delay=value.get('after_seconds',10800)
  if type(delay) is not int or delay not in DELAYS:delay=10800
- return dict(daytime_auto_cleanup=value.get('daytime_auto_cleanup') is True,after_seconds=delay,timezone='America/Los_Angeles',daytime_only=True)
+ from station_location import location_at
+ return dict(observation_location=location_at(root),daytime_auto_cleanup=value.get('daytime_auto_cleanup') is True,after_seconds=delay,timezone='America/Los_Angeles',daytime_only=True)
 
 def policy(root):
  value=settings(root)

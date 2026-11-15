@@ -180,6 +180,9 @@ class InternetArchive:
             save(self.catalog/(job['id']+'.json'),m)
             if self.storage()['available'] and path.exists():save(path,m)
     def complete_session_plan(self,job,manifest):
+        sys.path.insert(0,str(Path(__file__).resolve().parent.parent/'uap-lab'))
+        from station_location import location_at
+        manifest=dict(manifest,observation_location=location_at(self.data.parent,manifest.get('started_epoch',0)),location_scope='session_start')
         """Archive the finalized session record, excluding raw/scratch video."""
         from manual_archive import enabled,plan
         if enabled(self,manifest):return plan(self,job,manifest)

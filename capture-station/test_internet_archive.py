@@ -79,6 +79,22 @@ class ArchiveTests(TestCase):
         snapshot=load(self.a.private/(SID+'-manifest.json'))
         self.assertEqual(snapshot['ce5_playback'],job['ce5_playback'])
         self.assertNotIn('ce5-tones',ArchiveAPI(self.a.private).item_headers({'id':SID})['x-archive-meta-subject'])
+    def test_location_uses_capture_time_and_only_coarse_fields(self):
+        import sqlite3
+        root=self.data.parent/'station-location';root.mkdir()
+        with sqlite3.connect(root/'history.sqlite') as db:
+            db.execute('CREATE TABLE fixes(sampled_epoch REAL PRIMARY KEY,valid_until REAL,status TEXT,county TEXT,state TEXT,country TEXT)')
+            db.executemany('INSERT INTO fixes VALUES(?,?,?,?,?,?)',[(100,280,'known','First County','CA','US'),(200,380,'known','Second County','CA','US')])
+        db.close()
+        self.m['started_epoch']=150;save(self.folder/'manifest.json',self.m)
+        self.a.job_cache.clear();self.a.discover()
+        snapshot=load(self.a.private/(SID+'-manifest.json'))
+        self.assertEqual(snapshot['location_scope'],'session_start')
+        self.assertEqual(snapshot['observation_location'],dict(status='known',precision='county',county='First County',state='CA',country='US',source='macos_location_services'))
+        self.m['started_epoch']=None;save(self.folder/'manifest.json',self.m)
+        self.a.job_cache.clear();self.a.discover()
+        self.assertEqual(load(self.a.private/(SID+'-manifest.json'))['observation_location']['status'],'unknown')
+
     def tearDown(self):self.tmp.cleanup()
     def test_recovers_only_transient_legacy_download_failures(self):
         self.upload()
