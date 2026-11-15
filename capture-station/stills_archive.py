@@ -68,7 +68,7 @@ class StillsArchive:
         if start:self.worker.start()
 
     def status(self):
-        return dict(phase=self.phase,error=self.error,last_success=self.last_success,url='https://github.com/Star-People/station-stills')
+        return dict(phase=self.phase,error=self.error,last_success=self.last_success,url='https://github.com/starpeopleai/station-stills')
 
     def git(self,*args):
         p=subprocess.run(['git','-C',str(self.repo),*args],capture_output=True,text=True,timeout=120)
