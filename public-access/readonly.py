@@ -7,9 +7,11 @@ from urllib.parse import urlsplit, parse_qs, urlencode
 
 PAGES={'/models','/','/metrics','/label-videos','/tracks','/labels','/events','/training'}
 ASSETS={'/'+name+ext for name in ('app','app-shell','style','metrics','label-videos','tracks','labels','events','email-review','maintenance') for ext in ('.js','.css')}
-ASSETS.update({'/review-filters.js','/review-filters.css','/observation-metrics.js','/observation-metrics.css','/ce5.js','/ufo-engraving.png','/models.js','/models-data.js','/models.css'})
+ASSETS.update({'/detections.js','/model-inspector.js','/model-inspector.css','/review-filters.js','/review-filters.css','/observation-metrics.js','/observation-metrics.css','/ce5.js','/ufo-engraving.png','/models.js','/models-data.js','/models.css'})
 ASSETS.update('/fonts/IBMPlexMono-'+name+'.woff2' for name in ('Regular','SemiBold','Bold'))
 JSON_ROUTES={
+ '/api/objects':{'view','classification','review_status','before','limit'},
+ '/api/model-inspector':set(),
  '/api/location':set(),
  '/api/observation-metrics':set(),
  '/api/service-status':set(), '/api/service-health':set(), '/api/state':set(),
@@ -22,12 +24,12 @@ JSON_ROUTES={
  '/api/live/artifact-status':{'session'}, '/api/labeled-frames/token':set(),
 }
 MEDIA_ROUTES={
- '/api/live/frame':{'t'},
+ '/api/live/frame':{'t','after'},
  '/api/annotation':{'id','annotation'}, '/api/labeled-image':{'source','id','annotation'},
  '/api/label-queue/image':{'id','full'},
 
 }
-PRIVATE=re.compile(r'token|csrf|password|secret|credential|authorization|cookie|recipient|email_address',re.I)
+PRIVATE=re.compile(r'token|csrf|password|secret|credential|authorization|cookie|recipient|email_address|latitude|longitude|coordinates',re.I)
 PATHS=re.compile(r'/(?:Users|Volumes|home)/[^\s"\'<>]*')
 
 def strip_rf_assets(raw):
@@ -40,6 +42,7 @@ def clean(value):
   value=dict(value)
   if 'original_available' in value:value['original_available']=False
   value.pop('review_url',None)
+  value.pop('video_url',None)
   return {k:('Details unavailable publicly' if k=='error' and v else clean(v)) for k,v in value.items() if not PRIVATE.search(k)}
  if isinstance(value,list):return [clean(v) for v in value]
  if isinstance(value,str):return PATHS.sub('[private path]',value)

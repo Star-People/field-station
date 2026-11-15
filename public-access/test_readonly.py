@@ -28,6 +28,15 @@ class ReadOnlyTests(unittest.TestCase):
   for path in ('/api/model-tests','/api/training-control/start','/api/objects/omit'):
    self.assertEqual(self.get(path,'POST')[0],405)
   self.assertEqual(calls,Upstream.calls)
+ def test_current_detection_and_model_routes(self):
+  for path in ('/api/objects?view=starred&classification=anomalous&review_status=human_reviewed&limit=100','/api/model-inspector','/detections.js','/review-filters.js','/model-inspector.js','/model-inspector.css'):
+   self.assertEqual(self.get(path)[0],200,path)
+  calls=list(Upstream.calls)
+  self.assertEqual(self.get('/api/objects?url=http://example.com')[0],400)
+  self.assertEqual(self.get('/api/objects/labels','POST')[0],405)
+  self.assertEqual(calls,Upstream.calls)
+ def test_precise_location_removed(self):
+  self.assertEqual(clean({'latitude':37,'longitude':-122,'coordinates':[37,-122],'county':'San Mateo'}),{'county':'San Mateo'})
  def test_settings_are_private(self):
   for path in ('/api/settings','/api/hq/snapshot','/api/hq/reviews'):
    for method in ('GET','HEAD'):self.assertEqual(self.get(path,method)[0],404)
