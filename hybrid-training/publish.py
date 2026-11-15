@@ -2,7 +2,7 @@
 import json,shutil,tarfile,tempfile,time
 from pathlib import Path
 
-def publish(root,folder,repository='Star-People/anomaly-vision-model'):
+def publish(root,folder,repository='starpeopleai/anomaly-vision-model'):
  from model_publication import GitHub,sha,save
  dataset=json.loads((folder/'dataset.json').read_text());lane=dataset.get('training_lane','hybrid');policy=json.loads((folder/'candidate-policy.json').read_text());version=policy['version'];receipt=root/'publications'/(version+'.json')
  if receipt.exists():return json.loads(receipt.read_text())
