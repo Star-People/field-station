@@ -21,7 +21,7 @@ with (ROOT/'refresh.lock').open('a') as lock:
   run('build.py','--source',stage,'--output',ROOT/'site','--training',training)
   if json.loads((stage/'missing-thumbnails.json').read_text()):
    run('pull_missing.py','--source',stage,'--helper',helper)
-   run('build.py','--source',stage,'--output',ROOT/'site','--training',training)
+   run('complete_media.py','--source',stage,'--output',ROOT/'site')
   run('publish.py','--site',ROOT/'site')
   source=ROOT/'source'
   if source.exists():shutil.rmtree(source)
