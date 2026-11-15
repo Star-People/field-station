@@ -19,7 +19,7 @@ Existing reviewed aircraft, birds, insects, clouds, stars, satellites, vehicles,
 | `field-archive/` | Verified evidence replication and receiving |
 | `config/` | Example configuration without credentials or station identifiers |
 
-Current Core ML model releases live in [anomaly-vision-model](https://github.com/ufo-files/anomaly-vision-model). Published RF data lives in [signals](https://github.com/ufo-files/signals).
+Current Core ML model releases live in [anomaly-vision-model](https://github.com/Star-People/anomaly-vision-model). Published RF data lives in [signals](https://github.com/Star-People/signals).
 
 ## Apple Silicon setup
 
