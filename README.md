@@ -231,3 +231,10 @@ Machine-only experimental training does not require separate recording groups fo
 
 
 Train now starts one durable four-model cascade. Stable trains and activates first; the remaining lanes train sequentially in the last shared leaderboard order, using the ranking measure selected in Metrics (false-positive rate by default). Ties keep experimental, hybrid, machine-only order; unranked lanes run last. The order and machine-label manifests are frozen at cycle start. Human experimental and hybrid use the completed stable run’s human snapshot; machine-only retains machine supervision. Each lane receives a new immutable run ID per click. Experimental collectors continue gathering data but do not start independent scheduled training. The cycle publishes its models, then draws one fresh shared 500-image evaluation. Per-step completion and errors survive restarts; failed steps do not prevent the other lanes from running. Stable activation retries finish before followers start. Only stable can become live.
+
+
+## Current licensing
+
+Original UFO Files software is available under the **UFO Files Noncommercial Shared-Source License 1.0**: no commercial use; distributed derivatives and modified network services must provide corresponding source under the same terms. Original content is **CC BY-NC-SA 4.0**, only to the extent we control its rights.
+
+See [LICENSE](LICENSE), [LICENSE-CONTENT.txt](LICENSE-CONTENT.txt), and [LICENSING.md](LICENSING.md) for scope, exceptions, and the transition from prior grants. These are source-available terms, not an OSI-approved open-source license. Third-party materials and public-domain records retain their own status.

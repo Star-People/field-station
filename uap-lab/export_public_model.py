@@ -15,6 +15,8 @@ def read(p,default=None):
 
 def build(destination):
     destination=Path(destination);destination.mkdir(parents=True,exist_ok=True);(destination/'templates').mkdir(exist_ok=True)
+    for license_name in ('LICENSE','LICENSE-CONTENT.txt','LICENSING.md'):
+        shutil.copyfile(ROOT.parent/license_name,destination/license_name)
     omitted=read(DATA/'omitted-videos.json',{});examples=[];annotations=[];sources={};skipped=Counter();usable=0
     for folder in sorted((DATA/'videos').iterdir()):
         video=read(folder/'video.json',{});review=read(folder/'review.json',{})
@@ -74,13 +76,13 @@ def write_release(destination,examples,annotations,sources,usable,skipped,saved_
     destination=Path(destination)
     if not examples:raise ValueError('No eligible completed publishable-source annotations')
     fingerprint=hashlib.sha256(json.dumps(dict(examples=examples,annotations=annotations),sort_keys=True).encode()).hexdigest()
-    model=dict(schema_version=1,id=(saved_model or {}).get('id',fingerprint[:32]),release=('model-'+saved_model['id']) if saved_model else 'v0.1.0-preview',kind='multiscale normalized appearance matching',classes=sorted({e['label'] for e in examples}),examples=examples,dataset_sha256=fingerprint,license='Apache-2.0 for original code, annotations, and compilation; source media terms are separate',parameters=dict(scales=[.65,.8,1,1.25,1.6],overlap_suppression=.35,default_threshold=.97,native_detail_threshold=.55,native_detail_gaussian_sigma=1.2,inference_revision=2),created_utc=(datetime.fromtimestamp(saved_model['created'],timezone.utc).isoformat() if saved_model and saved_model.get('created') else datetime.now(timezone.utc).isoformat()))
+    model=dict(schema_version=1,id=(saved_model or {}).get('id',fingerprint[:32]),release=('model-'+saved_model['id']) if saved_model else 'v0.1.0-preview',kind='multiscale normalized appearance matching',classes=sorted({e['label'] for e in examples}),examples=examples,dataset_sha256=fingerprint,license='LicenseRef-UFO-Files-NC-Shared-Source-1.0 for original software; CC-BY-NC-SA-4.0 for original annotations and compilation; prior grants and source media terms remain separate',parameters=dict(scales=[.65,.8,1,1.25,1.6],overlap_suppression=.35,default_threshold=.97,native_detail_threshold=.55,native_detail_gaussian_sigma=1.2,inference_revision=2),created_utc=(datetime.fromtimestamp(saved_model['created'],timezone.utc).isoformat() if saved_model and saved_model.get('created') else datetime.now(timezone.utc).isoformat()))
     if saved_model and saved_model.get('temporal'):
         model.update(schema_version=2,temporal=saved_model['temporal'])
     for name,value in (('model.json',model),('annotations.json',annotations),('sources.json',list(sources.values()))): (destination/name).write_text(json.dumps(value,indent=2)+'\n')
     source=(ROOT/'lab.py').read_text();tree=ast.parse(source);detect=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='detect')
     engine=ast.get_source_segment(source,detect)
-    header='''# SPDX-License-Identifier: Apache-2.0
+    header='''# SPDX-License-Identifier: LicenseRef-UFO-Files-NC-Shared-Source-1.0
 # Copyright 2026 ufo-files contributors
 """Portable inference for the UAP appearance model. No station services required."""
 import argparse, hashlib, json, sys
@@ -188,7 +190,7 @@ More templates increase CPU inference time. Start with still images before long 
 
 ## Sources and license
 
-Original code, annotations, and compilation: **Apache License 2.0**, in [LICENSE](LICENSE). Source image crops retain their source-media status and terms; they are not relicensed as original imagery. [sources.json](sources.json) lists the official DVIDS page and source-video checksum for every contributing video. Source rights markings and attribution are recorded for each source; source media retain those separate terms. See [NOTICE](NOTICE) and [DVIDS source terms](https://www.dvidshub.net/about/copyright).
+Original code, annotations, and compilation: the noncommercial terms in [LICENSING.md](LICENSING.md). Source image crops retain their source-media status and terms; they are not relicensed as original imagery. [sources.json](sources.json) lists the official DVIDS page and source-video checksum for every contributing video. Source rights markings and attribution are recorded for each source; source media retain those separate terms. See [NOTICE](NOTICE) and [DVIDS source terms](https://www.dvidshub.net/about/copyright).
 
 The appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement.
 ''')
@@ -218,8 +220,8 @@ Use `python -m unittest -v test_inference` after installing requirements. `SHA25
 
 ## Attribution
 
-Apache 2.0 applies to the project's original code, annotations, and compilation. Source media retain their separate status and terms described by official source pages. See LICENSE, NOTICE, and sources.json. Third-party software is installed separately and retains its own licenses.
+The noncommercial terms in LICENSING.md apply to original software, annotations, and compilation; prior Apache-2.0 grants remain valid. Source media retain their separate status and terms described by official source pages. See LICENSE, NOTICE, and sources.json. Third-party software is installed separately and retains its own licenses.
 ''')
-    (destination/'NOTICE').write_text('UAP Observation Model\nCopyright 2026 ufo-files contributors\n\nOriginal code, annotations, and compilation are licensed under Apache License 2.0.\nSource image crops retain their source-media status and terms; they are not claimed as original imagery.\nSource credits and official URLs are listed in sources.json.\nDVIDS source terms: https://www.dvidshub.net/about/copyright\n\nThe appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement.\n\nOpenCV and NumPy are installed separately under their respective licenses.\n')
+    (destination/'NOTICE').write_text('UAP Observation Model\nCopyright 2026 ufo-files contributors\n\nOriginal software is licensed under the UFO Files Noncommercial Shared-Source License 1.0. Original annotations and compilation are licensed under CC BY-NC-SA 4.0, to the extent UFO Files controls those rights. Prior Apache-2.0 grants remain valid. See LICENSING.md.\nSource image crops retain their source-media status and terms; they are not claimed as original imagery.\nSource credits and official URLs are listed in sources.json.\nDVIDS source terms: https://www.dvidshub.net/about/copyright\n\nThe appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement.\n\nOpenCV and NumPy are installed separately under their respective licenses.\n')
     print(json.dumps(summary,indent=2));return summary
 if __name__=='__main__':build(sys.argv[1])
