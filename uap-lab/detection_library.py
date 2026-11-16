@@ -269,5 +269,8 @@ def label_batch(data,body):
    if omitted(data,item.get('id')):
     results.append(dict(saved=False,discarded=True,id=item.get('id'),request_id=item.get('request_id'),error='Object was deleted'));continue
    try:results.append(dict(label(data,item),request_id=item.get('request_id')))
-   except (ValueError,OSError,KeyError,TypeError) as exc:results.append(dict(saved=False,id=item.get('id') if isinstance(item,dict) else None,request_id=item.get('request_id') if isinstance(item,dict) else None,error=str(exc)))
+   except (ValueError,OSError,KeyError,TypeError) as exc:
+    import errno
+    retryable=isinstance(exc,OSError) and exc.errno in (errno.ENOSPC,errno.EDQUOT)
+    results.append(dict(saved=False,id=item.get('id'),request_id=item.get('request_id'),error=str(exc),retryable=retryable))
  return dict(results=results)
