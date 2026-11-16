@@ -118,4 +118,17 @@ class RolloverPriorityTests(unittest.TestCase):
    api.create=fail;result=cycle({},root,api,now)
    self.assertEqual(result['last_api_check'],now)
    self.assertEqual(json.loads((root/'session-status.json').read_text())['state'],'live')
-   self.assertEqual(json.loads((root/'upcoming-status.json').read_text())['state'],'retry_pending')
+   self.assertIn('Future creation timed out',json.loads((root/'sessions.json').read_text())['upcoming_error'])
+
+class CreationRecoveryTests(unittest.TestCase):
+ def test_pending_creation_reuses_recovered_id_without_duplicate(self):
+  now=datetime(2026,11,11,12,tzinfo=ZONE).timestamp()
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t);s=SessionTests().state(root,now);entry=s['sessions'][slot(now)['key']];entry.pop('video_id');entry['creation_pending']=True;(root/'sessions.json').write_text(json.dumps(s))
+   api=API({'old':dict(lifeCycleStatus='LIFE_CYCLE_LIVE'),'next':dict(lifeCycleStatus='LIFE_CYCLE_TESTING',ingestionStatus='INGESTION_STATUS_ACTIVE')});api.recover=lambda e:'next'
+   result=cycle({},root,api,now);self.assertEqual(api.calls,[('complete','old')]);self.assertFalse(result['sessions'][slot(now)['key']]['creation_pending'])
+ def test_live_starting_waits_without_repeating_start(self):
+  now=datetime(2026,11,11,12,tzinfo=ZONE).timestamp()
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t);SessionTests().state(root,now);api=API({'old':dict(lifeCycleStatus='LIFE_CYCLE_COMPLETE'),'next':dict(lifeCycleStatus='LIFE_CYCLE_LIVE_STARTING')})
+   cycle({},root,api,now);self.assertEqual(api.calls,[])

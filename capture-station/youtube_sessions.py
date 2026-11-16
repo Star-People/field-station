@@ -1,5 +1,5 @@
 """Four Pacific-time sessions daily, preserving public replays and a local link ledger."""
-import argparse,fcntl,json,subprocess,time,uuid
+import argparse,fcntl,hashlib,json,subprocess,time,uuid
 from pathlib import Path
 from datetime import datetime,timedelta
 from zoneinfo import ZoneInfo
@@ -18,15 +18,16 @@ class Studio:
   p=subprocess.run(['osascript','-e',script],capture_output=True,text=True,timeout=45)
   if p.returncode:raise RuntimeError('YouTube Studio session unavailable: '+p.stderr.strip()[:240])
   return p.stdout.strip()
- def post(self,path,body):
-  key='__ufn_'+uuid.uuid4().hex
-  js="""(()=>{const n=document.querySelector('ytls-apiary-network-manager');if(!n)throw Error('Open a YouTube live dashboard');const info={...n.SUPPORTED_ENDPOINTS_.find(x=>x.path===PATH)};if(!info.path)throw Error('Unsupported Studio operation');delete info.successAction;delete info.failAction;delete info.requestAction;window[KEY]={pending:true};n.postApiaryData_(info,{},'data',BODY).then(r=>{window[KEY]={done:true,result:r.data||r}},e=>{window[KEY]={done:true,error:String(e)}});return 'started'})()"""
-  js=js.replace('PATH',json.dumps(path)).replace('KEY',json.dumps(key)).replace('BODY',json.dumps(body))
+ def post(self,path,body,key=None):
+  retained=key is not None
+  key=key or '__ufn_'+uuid.uuid4().hex
+  js="""(()=>{const n=document.querySelector('ytls-apiary-network-manager');if(!n)throw Error('Open a YouTube live dashboard');const info={...n.SUPPORTED_ENDPOINTS_.find(x=>x.path===PATH)};if(!info.path)throw Error('Unsupported Studio operation');delete info.successAction;delete info.failAction;delete info.requestAction;if(RETAINED){const prior=window[KEY]||JSON.parse(sessionStorage.getItem(KEY)||'null');if(prior){window[KEY]=prior;return 'resuming'}}window[KEY]={pending:true};n.postApiaryData_(info,{},'data',BODY).then(r=>{window[KEY]={done:true,result:r.data||r};if(RETAINED)sessionStorage.setItem(KEY,JSON.stringify(window[KEY]))},e=>{window[KEY]={done:true,error:String(e)}});return 'started'})()"""
+  js=js.replace('PATH',json.dumps(path)).replace('KEY',json.dumps(key)).replace('BODY',json.dumps(body)).replace('RETAINED','true' if retained else 'false')
   self.evaluate(js)
   for _ in range(45):
    value=json.loads(self.evaluate('JSON.stringify(window['+json.dumps(key)+']||{pending:true})'))
    if value.get('done'):
-    self.evaluate('delete window['+json.dumps(key)+'];true')
+    if not retained:self.evaluate('delete window['+json.dumps(key)+'];true')
     result=value.get('result',{})
     if value.get('error') or result.get('errors') or result.get('error') or result.get('response',{}).get('error'):raise RuntimeError('YouTube rejected '+path+': '+str(value.get('error') or result.get('errors') or result.get('error') or result.get('response',{}).get('error'))[:400])
     return result
@@ -42,9 +43,20 @@ class Studio:
    self.refresh_dashboard()
    raise
   return {r['videoId']:r for r in result.get('broadcastStatus',[])}
+ def creation_key(self,entry):return '__ufn_create_'+hashlib.sha256(entry['key'].encode()).hexdigest()
+ def recover(self,entry):
+  key=json.dumps(self.creation_key(entry))
+  value=json.loads(self.evaluate('JSON.stringify(window['+key+']||JSON.parse(sessionStorage.getItem('+key+')||"null"))') or 'null')
+  if not value or not value.get('done'):return None
+  return self.created_id(value.get('result',{}))
+ def created_id(self,result):
+  video=result.get('videoId')
+  for command in result.get('commands',[]):
+   video=video or command.get('setBroadcastInfoCommand',{}).get('videoId')
+  return video
  def create(self,entry,config):
   body=dict(useMasks=True,broadcastSource='BROADCAST_SOURCE_ENCODER',broadcastType='BROADCAST_SCHEDULED',videoMetadata=dict(title=entry['title'],description=config['description']+'\n\nSession: '+entry['key']+' to '+datetime.fromtimestamp(entry['end'],ZONE).isoformat()+'. Saved six-hour observation replay.',videoCategory='CATEGORY_PEOPLE',privacyStatus='PUBLIC'),videoMetadataMask=dict(setTitle=True,setDescription=True,setVideoCategory=True,setPrivacyStatus=True),broadcastMetadata=dict(enableMonitorStream=False,scheduleMetadata=dict(scheduledStartTimeSec=int(entry['start'])),latencyMode='LATENCY_NORMAL'),broadcastMetadataMask=dict(setEnableMonitorStream=True,scheduleMetadataMask=dict(setScheduledStartTimeSec=True),setLatencyMode=True),targetEntity=dict(externalChannelId=config['channel']))
-  result=self.post('/live/create_broadcast',body)
+  result=self.post('/live/create_broadcast',body,key=self.creation_key(entry))
   video=result.get('videoId')
   if not video:
    for command in result.get('commands',[]):
@@ -71,11 +83,17 @@ def cycle(config,root,api,epoch=None):
  def ensure(window):
   entry=entries.setdefault(window['key'],dict(window))
   if not entry.get('video_id'):
-   if entry.get('creation_pending'):raise RuntimeError('Broadcast creation outcome uncertain; reconciliation required for '+entry['key'])
-   entry['creation_pending']=True;persist()
-   video=api.create(entry,config);entry.update(video_id=video,watch_url='https://www.youtube.com/watch?v='+video,creation_pending=False);persist()
+   if entry.get('creation_pending'):
+    video=api.recover(entry)
+    if not video:raise RuntimeError('Broadcast creation outcome uncertain; reconciliation required for '+entry['key'])
+   else:
+    entry['creation_pending']=True;persist()
+    video=api.create(entry,config)
+   entry.update(video_id=video,watch_url='https://www.youtube.com/watch?v='+video,creation_pending=False);persist()
   if not entry.get('configured'):
    api.configure(entry['video_id']);entry['configured']=True;persist()
+  return entry
+ def artwork(entry):
   thumbnail=config.get('thumbnail') or {};revision=thumbnail.get('revision')
   if revision and thumbnail.get('video_still') and entry.get('thumbnail_revision')!=revision and now>=entry.get('thumbnail_retry_after',0):
    try:
@@ -86,18 +104,19 @@ def cycle(config,root,api,epoch=None):
     # Artwork failure must never block encoder handoff or create another broadcast.
     entry.update(thumbnail_error=str(exc)[:300],thumbnail_retry_after=now+300)
    persist()
-  return entry
- target=ensure(current);future=None
- # Current-slot handoff takes priority over preparation of the following slot.
- if state.get('active_video_id')==target['video_id'] and target.get('state')=='live':
+
+ target=ensure(current)
+ def prepare_future():
   try:
-   future=ensure(upcoming)
-   save(root/'upcoming-status.json',dict(state='ready',video_id=future['video_id'],updated_epoch=now))
+   future=ensure(upcoming);state.pop('upcoming_error',None)
   except Exception as exc:
-   save(root/'upcoming-status.json',dict(state='retry_pending',error=str(exc),updated_epoch=now))
- if config.get('thumbnail',{}).get('revision'):
-  pending=[e['video_id'] for e in (target,future) if e and e.get('thumbnail_revision')!=config['thumbnail']['revision']]
-  save(root/'thumbnail-status.json',dict(state='retry_pending' if pending else 'ready',pending_video_ids=pending,updated_epoch=now))
+   state['upcoming_error']=str(exc)[:400];persist();return
+  # Future-session and artwork failures must not block current-session rollover.
+  for entry in (target,future):artwork(entry)
+  if config.get('thumbnail',{}).get('revision'):
+   pending=[e['video_id'] for e in (target,future) if e.get('thumbnail_revision')!=config['thumbnail']['revision']]
+   save(root/'thumbnail-status.json',dict(state='retry_pending' if pending else 'ready',pending_video_ids=pending,updated_epoch=now))
+  persist()
  active=state.get('active_video_id');wanted=target['video_id']
  # No polling is needed between boundaries once the current session is confirmed live.
  if active==wanted and target.get('state')=='live':
@@ -107,7 +126,7 @@ def cycle(config,root,api,epoch=None):
    confirmed=api.status([wanted]).get(wanted,{})
    if confirmed.get('lifeCycleStatus')!='LIFE_CYCLE_LIVE':raise RuntimeError('Current session is no longer confirmed live; check YouTube Studio')
    state['last_api_check']=now;persist()
-  save(root/'session-status.json',dict(state='live',watch_url=target['watch_url'],next_boundary=target['end'],timezone=str(ZONE),updated_epoch=now));return state
+  save(root/'session-status.json',dict(state='live',watch_url=target['watch_url'],next_boundary=target['end'],timezone=str(ZONE),updated_epoch=now));prepare_future();return state
  ids=list(dict.fromkeys(x for x in (active,wanted) if x));statuses=api.status(ids);new=statuses.get(wanted,{})
  if wanted not in statuses:raise RuntimeError('Scheduled broadcast status unavailable; leaving current session unchanged')
  if active and active!=wanted:
@@ -133,12 +152,13 @@ def cycle(config,root,api,epoch=None):
   api.bind(wanted)
   if new.get('ingestionStatus')=='INGESTION_STATUS_ACTIVE':api.start(wanted)
  elif new.get('lifeCycleStatus')=='LIFE_CYCLE_TESTING':api.start(wanted)
+ elif new.get('lifeCycleStatus') in ('LIFE_CYCLE_LIVE_STARTING','LIFE_CYCLE_TEST_STARTING'):pass
  else:raise RuntimeError('Scheduled session cannot start: '+str(new.get('lifeCycleStatus')))
  save(root/'session-status.json',dict(state='transitioning' if state.get('active_video_id')!=wanted else 'live',watch_url=target['watch_url'],next_boundary=target['end'],timezone=str(ZONE),updated_epoch=now))
  return state
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--config',type=Path,required=True);a=p.parse_args();config=json.loads(a.config.read_text());root=a.config.parent
+ p=argparse.ArgumentParser();p.add_argument('--config',type=Path,required=True);a=p.parse_args();config=json.loads(a.config.read_text());root=a.config.resolve().parent
  if not config.get('enabled'):return
  with (root/'sessions.lock').open('a') as lock:
   try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
@@ -146,3 +166,4 @@ def main():
   try:cycle(config,root,Studio())
   except Exception as exc:save(root/'session-status.json',dict(state='retry_pending',error=str(exc),updated_epoch=time.time()));raise
 if __name__=='__main__':main()
+
