@@ -35,6 +35,28 @@ class LibraryTests(QueueTests):
    self.assertFalse(result['saved']);self.assertEqual(result['retryable'],retryable);self.assertEqual(result['request_id'],item['request_id'])
   recovered=library.label_batch(self.data,dict(items=[item]))['results'][0]
   self.assertTrue(recovered['saved'])
+ def test_incomplete_directory_does_not_force_full_index_rebuild(self):
+  import os
+  from email_training import review_batch,current_review_index
+  item=dict(id=f'{1:032x}',label='anomalous',request_id='a'*32)
+  self.assertTrue(library.label_batch(self.data,dict(items=[item]))['results'][0]['saved'])
+  root=self.data/'email-reviews';(root/'examples'/('f'*32)).mkdir()
+  os.utime(root/'examples',ns=(time.time_ns()+1000000000,)*2)
+  with patch('concurrent.futures.ThreadPoolExecutor',side_effect=AssertionError('Full rebuild should not run')):
+   with review_batch(self.data):self.assertEqual(len(current_review_index(self.data)),1)
+ def test_rebuild_skips_incomplete_directory_and_preserves_committed_review(self):
+  from email_training import review_batch,current_review_index
+  item=dict(id=f'{1:032x}',label='anomalous',request_id='a'*32)
+  library.label_batch(self.data,dict(items=[item]));root=self.data/'email-reviews';(root/'examples'/('f'*32)).mkdir();(root/'training-manifest.json').unlink()
+  with review_batch(self.data):self.assertEqual(len(current_review_index(self.data)),1)
+ def test_newer_receipt_still_requires_recovery(self):
+  import os
+  from email_training import review_batch,current_review_index
+  item=dict(id=f'{1:032x}',label='anomalous',request_id='a'*32)
+  library.label_batch(self.data,dict(items=[item]));root=self.data/'email-reviews';stamp=time.time_ns()+1000000000
+  p=root/'examples'/item['id']/'review.json';record=json.loads(p.read_text());record['label']='not_anomalous';p.write_text(json.dumps(record))
+  for folder in ['examples','history']:os.utime(root/folder,ns=(stamp,stamp))
+  with review_batch(self.data):self.assertEqual(current_review_index(self.data)[0]['label'],'not_anomalous')
  def test_model_labels_are_not_reviews_or_training(self):
   self.assertEqual(listing(self.data)['counts'],dict(all=3,anomalous=1,not_anomalous=2,needs_review=1,human_reviewed=0,human_reviewed_anomalous=0))
   self.assertFalse((self.data/'email-reviews').exists())

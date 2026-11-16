@@ -47,6 +47,18 @@ def batch_metadata_cache(data):
  state=getattr(_REVIEW_BATCH,'state',None)
  return state.setdefault('archive_metadata',{}) if state and state['root']==Path(data)/'email-reviews' else None
 
+def review_index_stale(root,manifest,examples):
+ # A directory creation is not a committed review. Each committed change writes
+ # a unique history receipt before publishing the manifest, under review.lock.
+ stamp=manifest.stat().st_mtime_ns
+ history=root/'history'
+ if history.is_dir():return history.stat().st_mtime_ns>stamp
+ return examples.stat().st_mtime_ns>stamp
+
+def read_committed_review(path):
+ try:return json.loads(path.read_text())
+ except FileNotFoundError:return None  # Interrupted mkdir has no committed label.
+
 @contextmanager
 def review_batch(data):
  import fcntl,time
@@ -55,12 +67,12 @@ def review_batch(data):
  with (root/'review.lock').open('a') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX);manifest=root/'training-manifest.json';examples=root/'examples';dirty=False
   try:
-   if examples.stat().st_mtime_ns>manifest.stat().st_mtime_ns:raise ValueError('Stale index')
+   if review_index_stale(root,manifest,examples):raise ValueError('Stale index')
    rows=json.loads(manifest.read_text())['examples']
   except (OSError,KeyError,ValueError):
    from concurrent.futures import ThreadPoolExecutor
    paths=[p/'review.json' for p in examples.iterdir()] if examples.exists() else []
-   with ThreadPoolExecutor(max_workers=4) as pool:rows=list(pool.map(lambda p:json.loads(p.read_text()),paths))
+   with ThreadPoolExecutor(max_workers=4) as pool:rows=[r for r in pool.map(read_committed_review,paths) if r is not None]
    dirty=True
   state=dict(root=root,examples=rows,dirty=dirty);_REVIEW_BATCH.state=state
   try:yield
