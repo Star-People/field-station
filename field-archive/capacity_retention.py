@@ -1,16 +1,24 @@
 """Private, checksum-verified capacity offload. No age-based candidate deletion."""
-import argparse,hashlib,json,os,plistlib,shutil,sqlite3,subprocess,sys,tarfile,time
+import argparse,hashlib,json,os,plistlib,shutil,sqlite3,subprocess,sys,tarfile,tempfile,time
 from pathlib import Path
 
 def read(p,default=None):
     return json.loads(p.read_text()) if p.exists() else default
-def save(p,value):
-    p.parent.mkdir(parents=True,exist_ok=True);tmp=p.with_suffix('.tmp')
-    with tmp.open('w') as f:json.dump(value,f,sort_keys=True);f.flush();os.fsync(f.fileno())
-    tmp.replace(p)
-    fd=os.open(p.parent,os.O_RDONLY)
-    try:os.fsync(fd)
-    finally:os.close(fd)
+def save(path,value):
+    path.parent.mkdir(parents=True,exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode='w',dir=path.parent,prefix=path.name+'.',suffix='.tmp',delete=False) as f:
+        tmp=Path(f.name)
+        try:json.dump(value,f,sort_keys=True);f.flush();os.fsync(f.fileno())
+        except BaseException:tmp.unlink(missing_ok=True);raise
+    try:
+        tmp.replace(path)
+        fd=os.open(path.parent,os.O_RDONLY)
+        try:os.fsync(fd)
+        finally:os.close(fd)
+    finally:tmp.unlink(missing_ok=True)
+def pressure_status(path):
+    try:return read(path,{})
+    except (json.JSONDecodeError,UnicodeDecodeError):return {}
 def digest(p):
     h=hashlib.sha256()
     with p.open('rb') as f:
@@ -192,7 +200,7 @@ def main():
     if not root.is_mount() or info.get('VolumeUUID')!=cfg.get('volume_uuid'):raise ValueError('Wrong field SSD')
     if (root/'.field-station-volume').read_text().strip()!=cfg['volume_marker']:raise ValueError('Wrong field marker')
     if args.action=='status':
-        usage=shutil.disk_usage(root);old=read(root/'retention/status.json',{});volumes=storage_pressure(root,cfg,old.get('offloading',False));active=any(v['offloading'] for v in volumes)
+        usage=shutil.disk_usage(root);old=pressure_status(root/'retention/status.json');volumes=storage_pressure(root,cfg,old.get('offloading',False));active=any(v['offloading'] for v in volumes)
         result=dict(epoch=time.time(),offloading=active,free_bytes=usage.free,total_bytes=usage.total,reserve_bytes=cfg['reserve_gib']*1024**3,candidates=[],volumes=volumes)
         if active:
             result['phase']='scanning_protection';save(root/'retention/status.json',result)

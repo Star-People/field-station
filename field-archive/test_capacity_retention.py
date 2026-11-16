@@ -199,3 +199,19 @@ class JournalProtectionTests(unittest.TestCase):
             self.assertTrue(c.shard_eligible(root,'recognition-1',context))
             c.save(manifest,dict(examples=[dict(generation='run-a',pts_seconds=10)]))
             self.assertFalse(c.shard_eligible(root,'recognition-1'))
+
+class StatusRecoveryTests(unittest.TestCase):
+ def test_concurrent_status_writers_publish_complete_json(self):
+  from concurrent.futures import ThreadPoolExecutor
+  import capacity_retention as capacity
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d)/'status.json'
+   with ThreadPoolExecutor(max_workers=8) as pool:list(pool.map(lambda n:capacity.save(p,{'writer':n,'payload':str(n)*1000}),range(32)))
+   value=json.loads(p.read_text());self.assertEqual(value['payload'],str(value['writer'])*1000)
+   self.assertEqual(list(Path(d).glob('*.tmp')),[])
+ def test_corrupt_status_can_be_rebuilt_without_relaxing_receipt_reads(self):
+  import capacity_retention as capacity
+  with tempfile.TemporaryDirectory() as d:
+   p=Path(d)/'status.json';p.write_text('{"offloading":true}garbage')
+   self.assertEqual(capacity.pressure_status(p),{})
+   with self.assertRaises(json.JSONDecodeError):capacity.read(p)
