@@ -20,24 +20,32 @@ def fingerprint(value):return hashlib.sha256(json.dumps(value,sort_keys=True,sep
 def checked(root,name):
     root=Path(root);relative=Path(name);p=root/relative
     if relative.is_absolute() or '..' in relative.parts or not relative.parts:raise ValueError('Unsafe archive path')
-    # A completed generation may be relocated independently of the active spool.
-    # Only the first symlink is eligible, and its exact relative path must be registered.
-    prefixes=[root.joinpath(*relative.parts[:i]) for i in range(1,len(relative.parts)+1)]
-    top=next((candidate for candidate in prefixes if candidate.is_symlink()),root/relative.parts[0])
-    if top.is_symlink():
-        # Only explicitly registered external roots may cross a filesystem boundary.
-        spec=read(root/'retention-policy.json',{}).get('storage_aliases',{}).get(str(top.relative_to(root)),{})
-        if not spec:raise ValueError('Unregistered storage alias')
-        volume=Path(spec['volume']);target=Path(spec['target'])
-        if not volume.is_mount() or (volume/'.field-spool-volume').read_text().strip()!=spec['identity'] or top.resolve()!=target.resolve() or not target.resolve().is_relative_to(volume.resolve()):raise ValueError('Storage alias unavailable')
-        if p==top:return p
-        if p.is_symlink() or any(x.is_symlink() for x in p.parents if x!=top and x.is_relative_to(top)) or not p.resolve().is_relative_to(target.resolve()):raise ValueError('Unsafe archive path')
-    elif p.is_symlink() or not p.resolve().is_relative_to(root.resolve()) or any(x.is_symlink() for x in p.parents if x!=root and x.is_relative_to(root)):
-        raise ValueError('Unsafe archive path')
+    aliases=None
+    boundary=root.resolve()
+    for i in range(1,len(relative.parts)+1):
+        current=root.joinpath(*relative.parts[:i])
+        if current.is_symlink():
+            if aliases is None:aliases=read(root/'retention-policy.json',{}).get('storage_aliases',{})
+            spec=aliases.get(str(current.relative_to(root)))
+            if not spec:raise ValueError('Unregistered storage alias')
+            volume=Path(spec['volume']);target=Path(spec['target'])
+            if not volume.is_mount() or (volume/'.field-spool-volume').read_text().strip()!=spec['identity'] or current.resolve()!=target.resolve() or not target.resolve().is_relative_to(volume.resolve()):raise ValueError('Storage alias unavailable')
+            boundary=target.resolve()
+    if not p.resolve().is_relative_to(boundary):raise ValueError('Unsafe archive path')
     return p
 def pressure(total,free,active,policy):
     used=1-free/total
     return used>policy['target_used_fraction'] if active else used>=policy['offload_used_fraction']
+def storage_pressure(root,cfg,active):
+    root=Path(root);volumes={str(root)}
+    for spec in {v['volume']:v for v in cfg.get('storage_aliases',{}).values()}.values():
+        volume=Path(spec['volume'])
+        if volume.is_mount() and (volume/'.field-spool-volume').read_text().strip()==spec['identity']:volumes.add(str(volume))
+    rows=[]
+    for volume in sorted(volumes):
+        usage=shutil.disk_usage(volume)
+        rows.append(dict(volume=volume,total_bytes=usage.total,free_bytes=usage.free,offloading=pressure(usage.total,usage.free,active,cfg)))
+    return rows
 NEGATIVE_LABELS={'not_anomalous','bird','insect','airplane','cloud','other_animal','balloon','star','satellite','shooting_star','vehicle','drone'}
 def negative_annotations(annotations):
     return bool(annotations) and all(a.get('label') in NEGATIVE_LABELS for a in annotations)
@@ -104,7 +112,11 @@ def shard_eligible(root,sid):
     p=shard_path(root,sid)
     if not p.is_file() or time.time()-p.stat().st_mtime<120:return False
     db=sqlite3.connect(p.as_uri()+'?mode=ro',uri=True)
-    try:ranges=list(db.execute('SELECT generation,min(pts),max(pts) FROM frames GROUP BY generation'))
+    try:
+        ranges=[];row=db.execute('SELECT generation FROM frames ORDER BY generation LIMIT 1').fetchone()
+        while row:
+            gen=row[0];start=db.execute('SELECT min(pts) FROM frames WHERE generation=?',(gen,)).fetchone()[0];end=db.execute('SELECT max(pts) FROM frames WHERE generation=?',(gen,)).fetchone()[0];ranges.append((gen,start,end))
+            row=db.execute('SELECT generation FROM frames WHERE generation>? ORDER BY generation LIMIT 1',(gen,)).fetchone()
     finally:db.close()
     for gen,start,end in ranges:
         ack=read(checked(root,'capture-spool/'+gen+'/recognition-ack.json'),{})
@@ -114,8 +126,11 @@ def shard_eligible(root,sid):
             if m.get('session_media_removed') or m.get('spool_generation')!=gen:continue
             segments=read(mpath.parent/'buffer-state.json',{}).get('segments',[])
             if not segments or (segments[0]['start']<=end and segments[-1]['end']>=start):return False
-        for rpath in (root/'uap-lab/email-reviews/examples').glob('*/review.json'):
-            r=read(rpath,{})
+        manifest=root/'uap-lab/email-reviews/training-manifest.json'
+        if manifest.exists():
+            review_rows=read(manifest)['examples']
+        else:review_rows=(read(p,{}) for p in (root/'uap-lab/email-reviews/examples').glob('*/review.json'))
+        for r in review_rows:
             if r.get('deleted') or r.get('retired'):continue
             if r.get('generation')==gen and start-5<=r.get('pts_seconds',-100)<=end+5:return False
     return bool(ranges)
@@ -172,14 +187,18 @@ def main():
     if not root.is_mount() or info.get('VolumeUUID')!=cfg.get('volume_uuid'):raise ValueError('Wrong field SSD')
     if (root/'.field-station-volume').read_text().strip()!=cfg['volume_marker']:raise ValueError('Wrong field marker')
     if args.action=='status':
-        usage=shutil.disk_usage(root);old=read(root/'retention/status.json',{});active=pressure(usage.total,usage.free,old.get('offloading',False),cfg)
-        result=dict(epoch=time.time(),offloading=active,free_bytes=usage.free,total_bytes=usage.total,reserve_bytes=cfg['reserve_gib']*1024**3,candidates=[])
+        usage=shutil.disk_usage(root);old=read(root/'retention/status.json',{});volumes=storage_pressure(root,cfg,old.get('offloading',False));active=any(v['offloading'] for v in volumes)
+        result=dict(epoch=time.time(),offloading=active,free_bytes=usage.free,total_bytes=usage.total,reserve_bytes=cfg['reserve_gib']*1024**3,candidates=[],volumes=volumes)
         if active:
+            result['phase']='scanning_protection';save(root/'retention/status.json',result)
             context=protection_snapshot(root)
+            result['phase']='scanning_sessions';save(root/'retention/status.json',result)
             for p in sorted((root/'sessions').glob('*/manifest.json')):
+                if read(p,{}).get('session_media_removed'):continue
                 if eligible(root,p.parent.name,context):result['candidates'].append(p.parent.name)
                 if len(result['candidates'])>=10:break
             if cfg.get('offload_recognition_partitions',False) and len(result['candidates'])<10:
+                result['phase']='scanning_journals';save(root/'retention/status.json',result)
                 for p in sorted((root/'uap-lab/recognition/partitions').glob('*.sqlite')):
                     sid='recognition-'+p.stem
                     if eligible(root,sid):result['candidates'].append(sid)

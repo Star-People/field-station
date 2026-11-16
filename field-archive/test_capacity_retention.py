@@ -160,3 +160,29 @@ class StorageAliasTests(unittest.TestCase):
     with self.assertRaises(ValueError):checked(root,'capture-spool/run-a/../run-b')
     with patch.object(Path,'is_mount',return_value=False):
      with self.assertRaises(ValueError):checked(root,'capture-spool/run-a/segment.mkv')
+
+class NestedAliasTests(unittest.TestCase):
+    def test_each_nested_migration_alias_must_be_registered(self):
+        with tempfile.TemporaryDirectory() as d:
+            base=Path(d);root=base/'field';volume=base/'external';root.mkdir();volume.mkdir()
+            (volume/'.field-spool-volume').write_text('identity')
+            active=volume/'active';parts=volume/'parts';active.mkdir();parts.mkdir()
+            (root/'recognition').symlink_to(active);(active/'partitions').symlink_to(parts);(parts/'one.sqlite').write_bytes(b'data')
+            specs={'recognition':dict(volume=str(volume),target=str(active),identity='identity')}
+            c.save(root/'retention-policy.json',dict(storage_aliases=specs))
+            with patch.object(Path,'is_mount',return_value=True):
+                with self.assertRaisesRegex(ValueError,'Unregistered'):c.checked(root,'recognition/partitions/one.sqlite')
+                specs['recognition/partitions']=dict(volume=str(volume),target=str(parts),identity='identity');c.save(root/'retention-policy.json',dict(storage_aliases=specs))
+                self.assertEqual(c.checked(root,'recognition/partitions/one.sqlite').read_bytes(),b'data')
+                (parts/'escape').symlink_to(base/'outside')
+                with self.assertRaises(ValueError):c.checked(root,'recognition/partitions/escape')
+
+class PhysicalPressureTests(unittest.TestCase):
+    def test_full_alias_triggers_offload_when_primary_has_space(self):
+        from types import SimpleNamespace
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d)/'primary';volume=Path(d)/'secondary';root.mkdir();volume.mkdir();(volume/'.field-spool-volume').write_text('ok')
+            cfg=dict(target_used_fraction=.6,offload_used_fraction=.7,storage_aliases={'a':dict(volume=str(volume),identity='ok')})
+            with patch.object(Path,'is_mount',return_value=True),patch.object(c.shutil,'disk_usage',side_effect=lambda p:SimpleNamespace(total=100,free=2 if str(p)==str(volume) else 80)):
+                rows=c.storage_pressure(root,cfg,False)
+            self.assertTrue(next(r for r in rows if r['volume']==str(volume))['offloading']);self.assertFalse(next(r for r in rows if r['volume']==str(root))['offloading'])
