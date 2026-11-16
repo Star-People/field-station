@@ -27,6 +27,14 @@ class LibraryTests(QueueTests):
   (self.root/'notifications/outbox'/items[1]['id']/'native-object.png').write_bytes(b'corrupt')
   result=library.label_batch(self.data,dict(items=items));self.assertTrue(result['results'][0]['saved']);self.assertFalse(result['results'][1]['saved'])
   self.assertEqual(len(json.loads((self.data/'email-reviews/training-manifest.json').read_text())['examples']),1)
+ def test_storage_exhaustion_is_retryable_but_invalid_review_is_not(self):
+  import errno
+  item=dict(id=f'{1:032x}',label='anomalous',request_id='e'*32)
+  for exc,retryable in [(OSError(errno.ENOSPC,'No space left on device'),True),(OSError(errno.EDQUOT,'Disk quota exceeded'),True),(ValueError('Invalid object'),False)]:
+   with patch.object(library,'label',side_effect=exc):result=library.label_batch(self.data,dict(items=[item]))['results'][0]
+   self.assertFalse(result['saved']);self.assertEqual(result['retryable'],retryable);self.assertEqual(result['request_id'],item['request_id'])
+  recovered=library.label_batch(self.data,dict(items=[item]))['results'][0]
+  self.assertTrue(recovered['saved'])
  def test_model_labels_are_not_reviews_or_training(self):
   self.assertEqual(listing(self.data)['counts'],dict(all=3,anomalous=1,not_anomalous=2,needs_review=1,human_reviewed=0,human_reviewed_anomalous=0))
   self.assertFalse((self.data/'email-reviews').exists())
