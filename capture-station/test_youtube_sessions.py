@@ -35,11 +35,11 @@ class SessionTests(unittest.TestCase):
  def test_restart_does_not_duplicate_existing_sessions(self):
   now=datetime(2026,11,11,12,tzinfo=ZONE).timestamp()
   with tempfile.TemporaryDirectory() as t:
-   root=Path(t);s=self.state(root,now);s['active_video_id']='next';s['last_api_check']=now;s['sessions'][slot(now)['key']]['state']='live';(root/'sessions.json').write_text(json.dumps(s));api=API({});cycle({},root,api,now);self.assertEqual(api.calls,[])
+   root=Path(t);s=self.state(root,now);s['active_video_id']='next';s['last_api_check']=now;s['sessions'][slot(now)['key']]['state']='live';s['sessions'][slot(now)['key']]['live_embedding_verified']=True;(root/'sessions.json').write_text(json.dumps(s));api=API({});cycle({},root,api,now);self.assertEqual(api.calls,[])
 
 class ThumbnailTests(SessionTests):
  def active(self,root,now):
-  s=self.state(root,now);s['active_video_id']='next';s['last_api_check']=now;s['sessions'][slot(now)['key']]['state']='live';(root/'sessions.json').write_text(json.dumps(s))
+  s=self.state(root,now);s['active_video_id']='next';s['last_api_check']=now;s['sessions'][slot(now)['key']]['state']='live';s['sessions'][slot(now)['key']]['live_embedding_verified']=True;(root/'sessions.json').write_text(json.dumps(s))
  def test_current_and_upcoming_once_per_revision_and_after_restart(self):
   now=datetime(2026,11,11,12,tzinfo=ZONE).timestamp()
   with tempfile.TemporaryDirectory() as t:
@@ -79,3 +79,24 @@ class DashboardRecoveryTests(unittest.TestCase):
   api.post=rejected;api.refresh_dashboard=lambda:calls.append('refresh')
   with self.assertRaises(RuntimeError):api.status(['example'])
   self.assertEqual(calls,[])
+
+class EmbeddingTests(unittest.TestCase):
+ def test_partial_or_rejected_configuration_is_not_success(self):
+  from youtube_sessions import Studio
+  api=Studio()
+  for result in [{}, {'overallResult':{'resultCode':'UPDATE_SUCCESS'}}, {'overallResult':{'resultCode':'UPDATE_SUCCESS'},'distributionOptions':{'success':False},'madeForKids':{'success':True}}]:
+   api.post=lambda p,b:result
+   with self.assertRaises(RuntimeError):api.configure('video')
+  api.post=lambda p,b:{'overallResult':{'resultCode':'UPDATE_SUCCESS'},'distributionOptions':{'success':True},'madeForKids':{'success':True}}
+  api.configure('video')
+ def test_live_upgrade_retries_failed_embedding_without_losing_active_stream(self):
+  now=datetime(2026,11,11,12,tzinfo=ZONE).timestamp()
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t);s=SessionTests().state(root,now);s['active_video_id']='next';s['last_api_check']=now;s['sessions'][slot(now)['key']]['state']='live';(root/'sessions.json').write_text(json.dumps(s))
+   api=API({})
+   def fail(v):raise RuntimeError('rejected')
+   api.configure=fail
+   with self.assertRaises(RuntimeError):cycle({},root,api,now)
+   saved=json.loads((root/'sessions.json').read_text());self.assertEqual(saved['active_video_id'],'next');self.assertFalse(saved['sessions'][slot(now)['key']].get('live_embedding_verified'))
+   api.configure=API.configure.__get__(api);cycle({},root,api,now+15);cycle({},root,api,now+30)
+   self.assertEqual(api.calls,[('configure','next')])
