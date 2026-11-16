@@ -59,6 +59,26 @@ def read_committed_review(path):
  try:return json.loads(path.read_text())
  except FileNotFoundError:return None  # Interrupted mkdir has no committed label.
 
+def replay_review_receipts(root,manifest,rows):
+ # Recovery after an interrupted batch must not reopen every historical crop.
+ # Receipts identify the changed samples; their current records are authoritative.
+ import re,os
+ stamp=manifest.stat().st_mtime_ns;changed=set()
+ with os.scandir(root/'history') as entries:
+  for entry in entries:
+   if not entry.name.endswith('.json') or entry.stat().st_mtime_ns<stamp-1000000000:continue
+   receipt=json.loads(Path(entry.path).read_text());key=receipt.get('sample_id',receipt.get('event_id'))
+   if not isinstance(key,str) or not re.fullmatch('[a-f0-9]{32}',key):raise ValueError('Invalid review recovery receipt')
+   changed.add(key)
+ if not changed:raise ValueError('Review index requires full recovery')
+ indexed={r.get('sample_id',r.get('event_id')):r for r in rows}
+ if None in indexed:raise ValueError('Legacy review index requires full recovery')
+ for key in changed:
+  current=read_committed_review(root/'examples'/key/'review.json')
+  if current is None:indexed.pop(key,None)
+  else:indexed[key]=current
+ return list(indexed.values())
+
 @contextmanager
 def review_batch(data):
  import fcntl,time
@@ -67,8 +87,9 @@ def review_batch(data):
  with (root/'review.lock').open('a') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX);manifest=root/'training-manifest.json';examples=root/'examples';dirty=False
   try:
-   if review_index_stale(root,manifest,examples):raise ValueError('Stale index')
    rows=json.loads(manifest.read_text())['examples']
+   if review_index_stale(root,manifest,examples):
+    rows=replay_review_receipts(root,manifest,rows);dirty=True
   except (OSError,KeyError,ValueError):
    from concurrent.futures import ThreadPoolExecutor
    paths=[p/'review.json' for p in examples.iterdir()] if examples.exists() else []

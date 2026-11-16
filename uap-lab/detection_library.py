@@ -261,16 +261,20 @@ def label_batch(data,body):
  if not isinstance(items,list) or not 1<=len(items)<=50 or any(not isinstance(i,dict) for i in items):raise ValueError('Choose between 1 and 50 objects')
  results=[]
  reset_before=read(Path(data)/'review-pending-reset.json',{}).get('epoch',0)
- with _SAVE_LOCK,review_batch(data):
-  for item in items:
-   if reset_before and (not isinstance(item.get('queued_at'),(int,float)) or item['queued_at']<=reset_before):
-    results.append(dict(saved=False,discarded=True,id=item.get('id'),request_id=item.get('request_id'),error='Pending label discarded at your request'));continue
-   from object_omission import omitted
-   if omitted(data,item.get('id')):
-    results.append(dict(saved=False,discarded=True,id=item.get('id'),request_id=item.get('request_id'),error='Object was deleted'));continue
-   try:results.append(dict(label(data,item),request_id=item.get('request_id')))
-   except (ValueError,OSError,KeyError,TypeError) as exc:
-    import errno
-    retryable=isinstance(exc,OSError) and exc.errno in (errno.ENOSPC,errno.EDQUOT)
-    results.append(dict(saved=False,id=item.get('id'),request_id=item.get('request_id'),error=str(exc),retryable=retryable))
+ if not _SAVE_LOCK.acquire(timeout=1):
+  return dict(results=[dict(saved=False,retryable=True,id=i.get('id'),request_id=i.get('request_id'),error='Reviews are saving; retry shortly') for i in items])
+ try:
+  with review_batch(data):
+   for item in items:
+    if reset_before and (not isinstance(item.get('queued_at'),(int,float)) or item['queued_at']<=reset_before):
+     results.append(dict(saved=False,discarded=True,id=item.get('id'),request_id=item.get('request_id'),error='Pending label discarded at your request'));continue
+    from object_omission import omitted
+    if omitted(data,item.get('id')):
+     results.append(dict(saved=False,discarded=True,id=item.get('id'),request_id=item.get('request_id'),error='Object was deleted'));continue
+    try:results.append(dict(label(data,item),request_id=item.get('request_id')))
+    except (ValueError,OSError,KeyError,TypeError) as exc:
+     import errno
+     retryable=isinstance(exc,OSError) and exc.errno in (errno.ENOSPC,errno.EDQUOT)
+     results.append(dict(saved=False,id=item.get('id'),request_id=item.get('request_id'),error=str(exc),retryable=retryable))
+ finally:_SAVE_LOCK.release()
  return dict(results=results)
