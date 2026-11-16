@@ -52,6 +52,7 @@ def run_manual(controller,request):
    state['steps']['human']=dict(state='complete',version=controller.state['active_version'],folder=controller.state['run_directory'])
   except Exception as exc:
    state['steps']['human']=dict(state='failed',error=str(exc))
+   controller.mark('error',reason=str(exc))
   persist()
  if not state.get('stable_source'):
   from worker import model_folder

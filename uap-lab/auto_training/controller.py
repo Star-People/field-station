@@ -18,7 +18,7 @@ class Controller:
    volume=Path(cfg['storage_volume'])
    if not volume.is_mount() or not Path(cfg['root']).resolve().is_relative_to(volume.resolve()):raise ValueError('HQ training volume unavailable')
    if (volume/'.training-volume').read_text().strip()!=cfg['storage_volume_id']:raise ValueError('Wrong HQ training volume')
-  self.c=cfg;self.root=Path(cfg['root']);self.app=cfg['remote_app'];self.python=cfg['remote_python'];self.code=Path(__file__).resolve().parent;self.state=read(self.root/'status.json',{});self.recipe=hashlib.sha256(b''.join((self.code/name).read_bytes() for name in ('train_candidate.py','vision_features.py','training_policy.py','evaluate_candidate.py','training_benchmark.py','native_feature_worker.swift','refine_candidate.py','binary_refinement.py','correction_experiment.py','recording_balance.py','human_nonlinear.py','human_head.py','prospective.py','dataset.py','../classification_taxonomy.py','../binary_decision.py'))+json.dumps({'training_strategy':cfg.get('training_strategy','recording_balanced')},sort_keys=True).encode()).hexdigest()
+  self.c=cfg;self.root=Path(cfg['root']).resolve();self.app=cfg['remote_app'];self.python=cfg['remote_python'];self.code=Path(__file__).resolve().parent;self.state=read(self.root/'status.json',{});self.recipe=hashlib.sha256(b''.join((self.code/name).read_bytes() for name in ('train_candidate.py','vision_features.py','training_policy.py','evaluate_candidate.py','training_benchmark.py','native_feature_worker.swift','refine_candidate.py','binary_refinement.py','correction_experiment.py','recording_balance.py','human_nonlinear.py','human_head.py','prospective.py','dataset.py','../classification_taxonomy.py','../binary_decision.py'))+json.dumps({'training_strategy':cfg.get('training_strategy','recording_balanced')},sort_keys=True).encode()).hexdigest()
  def remote(self,args,**kwargs):
   transport=self.c.get('ssh_command',['ssh','-o','BatchMode=yes','-o','ConnectTimeout=10',self.c['host']])
   return subprocess.run([*transport,shlex.join(map(str,args))],check=True,**kwargs)
@@ -139,10 +139,11 @@ class Controller:
  def tick(self):
   self.notify_release()
   if self.recover():return
+  self.mark('snapshot',reason='Preparing the training dataset.',candidate_version=None,run_directory=None)
   snapshot=self.snapshot();fp=snapshot['fingerprint']
   if not re.fullmatch('[a-f0-9]{64}',fp):raise ValueError('Invalid snapshot identity')
   if not hasattr(self,'provisional_slot') and not hasattr(self,'manual_request_id') and fp==self.state.get('completed_fingerprint') and self.recipe==self.state.get('completed_recipe'):return
-  self.mark('snapshot',fingerprint=fp,examples=snapshot['examples'],reason=None,training_recipe=self.recipe)
+  self.mark('snapshot',fingerprint=fp,examples=snapshot['examples'],reason=None,training_recipe=self.recipe,candidate_version=None,run_directory=None)
   reviews=self.root/'reviews'/fp
   if not (reviews/'reviews.json').exists():self.download(self.app+'/auto-training/exports/'+fp,['reviews.json','images'],reviews)
   from collections import Counter

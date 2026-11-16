@@ -20,3 +20,10 @@ class StorageTests(unittest.TestCase):
    r=Path(d);p=r/'source';p.write_bytes(b'unique');link=r/'link';link.symlink_to(p)
    with self.assertRaisesRegex(ValueError,'symlink'):deduplicate([link],r/'objects')
    self.assertEqual(p.read_bytes(),b'unique')
+class CanonicalRootTests(unittest.TestCase):
+ def test_legacy_alias_keeps_pool_on_resolved_training_volume(self):
+  from controller import Controller
+  with tempfile.TemporaryDirectory() as temp:
+   base=Path(temp);target=base/'ssd/auto-training';target.mkdir(parents=True);alias=base/'home/auto-training';alias.parent.mkdir();alias.symlink_to(target,target_is_directory=True)
+   c=Controller(dict(root=str(alias),remote_app='/remote',remote_python='python'))
+   self.assertEqual(c.root,target.resolve());self.assertEqual(c.root.parent/'training-objects',base.resolve()/'ssd/training-objects')

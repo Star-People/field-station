@@ -11,6 +11,7 @@ class CascadeTests(unittest.TestCase):
  def setup_controller(self,root):
   cfg=dict(enabled=True,runtime=str(root),comparison_root=str(root))
   c=types.SimpleNamespace(root=root,c={'cascade':cfg},state={'active_version':'stable','run_directory':str(root/'stable'),'phase':'deployed'},rpc=lambda *a,**k:None)
+  c.mark=lambda phase,**fields:c.state.update(phase=phase,**fields)
   return c
  def test_sequential_failure_continues_and_restart_does_not_retrain(self):
   with tempfile.TemporaryDirectory() as temporary:
