@@ -14,3 +14,7 @@ The field station retains reviewed crops and labels for offline operation. HQ st
 Migration must pre-copy while services run, stop HQ writers for the final delta, verify source/destination contents, then update configurations and service wrappers. Historical absolute paths require compatibility symlinks. Retain original copies until service health and the independent backup are verified. Never fall back to an internal disk when an external volume is absent.
 
 Recognition journals are a separate storage consumer. Rollover uses SQLite `VACUUM INTO` to preserve a compact snapshot instead of duplicating the active database's unused pages. The compact partition is synced and published before pruning its rows from the active journal; interrupted rollover recovery remains idempotent.
+
+Large observation payloads use a versioned lossless compressed representation. Review and recovery readers accept both legacy JSON text and compressed payloads. Install compatible readers before enabling compressed writes; do not roll back readers to a version that only understands JSON text.
+
+Interrupted review batches recover their manifest by replaying changed audit receipts against current sample records. Missing or invalid manifests still trigger a full rebuild. This avoids making a routine service restart block new saves behind a scan of every historical sample.

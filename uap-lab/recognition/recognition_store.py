@@ -2,6 +2,7 @@
 import json,sqlite3,zlib,os,time
 from pathlib import Path
 import numpy as np
+from journal_codec import encode_observations
 try:
  import orjson
 except ImportError:
@@ -63,7 +64,7 @@ class RecognitionStore:
  def add(self,generation,row,model):
   archived=self.db.execute('SELECT last_sequence FROM archived_ranges WHERE generation=?',(generation,)).fetchone()
   if archived and row['sequence']<=archived[0]:raise sqlite3.IntegrityError('Native frame already archived')
-  self.db.execute('INSERT INTO frames VALUES(?,?,?,?,?,?)',(generation,row['sequence'],row['pts_seconds'],row['received_epoch'],model,encode(row['observations'])))
+  self.db.execute('INSERT INTO frames VALUES(?,?,?,?,?,?)',(generation,row['sequence'],row['pts_seconds'],row['received_epoch'],model,encode_observations(encode(row['observations']))))
  def commit(self,state,background):
   state=dict(state,background_shape=list(background.shape) if background is not None else None,background_encoding='zlib')
   self.db.execute('INSERT OR REPLACE INTO checkpoint VALUES(1,?,?)',(encode(state),zlib.compress(background.tobytes() if background is not None else b'',1)));self.db.commit();self.rotate()

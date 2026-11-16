@@ -57,6 +57,16 @@ class LibraryTests(QueueTests):
   p=root/'examples'/item['id']/'review.json';record=json.loads(p.read_text());record['label']='not_anomalous';p.write_text(json.dumps(record))
   for folder in ['examples','history']:os.utime(root/folder,ns=(stamp,stamp))
   with review_batch(self.data):self.assertEqual(current_review_index(self.data)[0]['label'],'not_anomalous')
+ def test_interrupted_batch_replays_only_changed_receipts(self):
+  import os
+  from email_training import review_batch,current_review_index
+  item=dict(id=f'{1:032x}',label='anomalous',request_id='a'*32)
+  library.label_batch(self.data,dict(items=[item]));root=self.data/'email-reviews'
+  p=root/'examples'/item['id']/'review.json';record=json.loads(p.read_text());record['label']='not_anomalous';p.write_text(json.dumps(record))
+  (root/'history'/'new.json').write_text(json.dumps(record))
+  stamp=time.time_ns()+1000000000;os.utime(root/'history',ns=(stamp,stamp))
+  with patch('concurrent.futures.ThreadPoolExecutor',side_effect=AssertionError('Full scan should not run')):
+   with review_batch(self.data):self.assertEqual(current_review_index(self.data)[0]['label'],'not_anomalous')
  def test_model_labels_are_not_reviews_or_training(self):
   self.assertEqual(listing(self.data)['counts'],dict(all=3,anomalous=1,not_anomalous=2,needs_review=1,human_reviewed=0,human_reviewed_anomalous=0))
   self.assertFalse((self.data/'email-reviews').exists())
