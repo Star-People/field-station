@@ -45,9 +45,14 @@ def finish_training(root,folder,code,human_root,state):
  except Exception as exc:state['publication_error']=str(exc)
  save(root/'status.json',state)
 
+def verify_storage(root,config):
+ volume=Path(config.get('storage_volume','/Volumes/UFO-Work'))
+ if not volume.is_mount() or not Path(root).resolve().is_relative_to(volume.resolve()):raise ValueError('HQ training volume unavailable')
+ if config.get('storage_volume_id') and (volume/'.training-volume').read_text().strip()!=config['storage_volume_id']:raise ValueError('Wrong HQ training volume')
+
 def run(c):
- root=Path(c['root']);machine=c.get('lane')=='machine_only';volume=Path('/Volumes/UFO-Work')
- if not volume.is_mount() or not root.resolve().is_relative_to(volume):raise ValueError('HQ external storage unavailable')
+ root=Path(c['root']);machine=c.get('lane')=='machine_only'
+ verify_storage(root,c)
  root.mkdir(parents=True,exist_ok=True);(root/'frames').mkdir(exist_ok=True)
  with (root/'worker.lock').open('a') as lock:
   try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

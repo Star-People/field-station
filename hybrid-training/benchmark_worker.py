@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from PIL import Image
-from worker import read,save,model_folder
+from worker import read,save,model_folder,verify_storage
 
 def choose(rows,count=500,seed=None):
  pool=[r for r in rows if r.get('human_confirmed') and r['label'] in ('anomalous','not_anomalous')]
@@ -22,7 +22,7 @@ def experimental_models(config):
 
 def cycle(config,force=False):
  root=Path(config['root']);human_root=Path(config['human_root']);code=Path(config['code'])
- if not Path('/Volumes/UFO-Work').is_mount() or not root.resolve().is_relative_to('/Volumes/UFO-Work'):raise ValueError('HQ external volume unavailable')
+ verify_storage(root,config)
  root.mkdir(parents=True,exist_ok=True)
  cascade=read(human_root/'cascade-status.json',{})
  if not force and cascade.get('phase') in ('preparing','training','activation_pending','evaluating','evaluation_retry_pending','publishing','publication_retry_pending'):return

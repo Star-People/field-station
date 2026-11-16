@@ -42,9 +42,10 @@ class RecognitionStore:
   if not ranges:return
   folder=self.path.parent/'partitions';folder.mkdir(exist_ok=True)
   temp=folder/(str(time.time_ns())+'.pending');dest=temp.with_suffix('.sqlite')
-  archive=sqlite3.connect(temp)
-  try:self.db.backup(archive);archive.execute('PRAGMA journal_mode=DELETE');archive.commit()
-  finally:archive.close()
+  # A backup copies the entire freelist left by prior rollovers. Compact the
+  # committed snapshot before publication so empty pages cannot accumulate
+  # in every immutable partition. The source is pruned only after fsync.
+  self.db.execute('VACUUM INTO ?', (str(temp),))
   with temp.open('rb') as f:os.fsync(f.fileno())
   temp.replace(dest)
   fd=os.open(folder,os.O_RDONLY)

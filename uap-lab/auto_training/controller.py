@@ -14,6 +14,10 @@ def save(p,d):
 
 class Controller:
  def __init__(self,cfg):
+  if cfg.get('storage_volume'):
+   volume=Path(cfg['storage_volume'])
+   if not volume.is_mount() or not Path(cfg['root']).resolve().is_relative_to(volume.resolve()):raise ValueError('HQ training volume unavailable')
+   if (volume/'.training-volume').read_text().strip()!=cfg['storage_volume_id']:raise ValueError('Wrong HQ training volume')
   self.c=cfg;self.root=Path(cfg['root']);self.app=cfg['remote_app'];self.python=cfg['remote_python'];self.code=Path(__file__).resolve().parent;self.state=read(self.root/'status.json',{});self.recipe=hashlib.sha256(b''.join((self.code/name).read_bytes() for name in ('train_candidate.py','vision_features.py','training_policy.py','evaluate_candidate.py','training_benchmark.py','native_feature_worker.swift','refine_candidate.py','binary_refinement.py','correction_experiment.py','recording_balance.py','human_nonlinear.py','human_head.py','prospective.py','dataset.py','../classification_taxonomy.py','../binary_decision.py'))+json.dumps({'training_strategy':cfg.get('training_strategy','recording_balanced')},sort_keys=True).encode()).hexdigest()
  def remote(self,args,**kwargs):
   transport=self.c.get('ssh_command',['ssh','-o','BatchMode=yes','-o','ConnectTimeout=10',self.c['host']])
