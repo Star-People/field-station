@@ -38,3 +38,15 @@ class CascadeTests(unittest.TestCase):
     result=run_manual(c,{'id':'two'});self.assertEqual(calls,['human','experimental','hybrid','machine']);self.assertEqual(result['phase'],'evaluation_retry_pending')
     module.compare=lambda *a:{'state':'complete'}
     result=run_manual(c,{'id':'two'});self.assertEqual(len(calls),4);self.assertEqual(result['phase'],'complete')
+
+ def test_stable_exception_updates_training_history_status(self):
+  with tempfile.TemporaryDirectory() as temporary:
+   root=Path(temporary);c=self.setup_controller(root)
+   c.state.update(phase='training')
+   c.tick=lambda:(_ for _ in ()).throw(ValueError('Image pool must share the source filesystem'))
+   module=types.SimpleNamespace(retry_publications=lambda *a:{},freeze_inputs=lambda *a:{'frozen':True},train_lane=lambda cfg,cycle,lane:{'version':lane},compare=lambda *a:{'state':'complete'})
+   with patch.dict('sys.modules',{'cascade_training':module,'worker':types.SimpleNamespace(model_folder=lambda *a:root/'stable')}):
+    result=run_manual(c,{'id':'failed-stable'})
+   self.assertEqual(result['steps']['human']['state'],'failed')
+   self.assertEqual(c.state['phase'],'error')
+   self.assertIn('source filesystem',c.state['reason'])
