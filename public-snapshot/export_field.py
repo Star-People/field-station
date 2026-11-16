@@ -72,6 +72,12 @@ def export(root,app,public):
  except Exception:failures.append('manual recordings')
  try:files['camera.jpg']=get('/api/live/frame')
  except Exception:failures.append('camera frame')
+ # Only public broadcast IDs and session times leave the station.
+ try:
+  sessions=json.loads((root.parent/'station-runtime/youtube/sessions.json').read_text()).get('sessions',{})
+  broadcasts=[dict(video_id=e['video_id'],start=e['start'],end=e['end']) for e in sessions.values() if re.fullmatch(r'[A-Za-z0-9_-]{11}',e.get('video_id','')) and e.get('end',0)>time.time()-86400]
+  files['responses/youtube.json']=json.dumps(dict(sessions=broadcasts)).encode()
+ except (OSError,ValueError,KeyError):failures.append('youtube sessions')
  files['snapshot.json']=json.dumps(dict(schema=1,captured_epoch=time.time(),objects=len(rows),unavailable=failures)).encode()
  out=io.BytesIO()
  with zipfile.ZipFile(out,'w',zipfile.ZIP_DEFLATED) as z:

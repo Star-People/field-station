@@ -1,4 +1,4 @@
-"""Composite the stacked UFO-FILES.APP NETWORK watermark."""
+"""Composite the stacked StarPeople.ai Network watermark."""
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 from broadcast_rf import FONT
@@ -29,5 +29,5 @@ class Watermark:
         logo=Image.new('RGBA',self.mask.size,(*ink,0));logo.putalpha(self.mask.point(lambda a:round(a*.88)))
         canvas.alpha_composite(logo,(30,26))
         draw=ImageDraw.Draw(canvas)
-        draw.text((90,35),'UFO-FILES.APP',font=self.font,anchor='lt',fill=(*ink,225))
-        draw.text((90,53),'NETWORK',font=self.font,anchor='lt',fill=(*ink,225))
+        draw.text((90,35),'StarPeople.ai',font=self.font,anchor='lt',fill=(*ink,225))
+        draw.text((90,53),'Network',font=self.font,anchor='lt',fill=(*ink,225))
