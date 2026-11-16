@@ -53,7 +53,9 @@ class Studio:
   if not video:raise RuntimeError('Created broadcast returned no identifier; reconcile before retrying')
   return video
  def configure(self,video):
-  self.post('/video_manager/metadata_update',dict(encryptedVideoId=video,videoReadMask={},distributionOptions=dict(newAllowEmbedding=True),madeForKids=dict(operation='MDE_MADE_FOR_KIDS_UPDATE_OPERATION_SET',newMfk='MDE_MADE_FOR_KIDS_TYPE_NOT_MFK')))
+  result=self.post('/video_manager/metadata_update',dict(encryptedVideoId=video,videoReadMask={},distributionOptions=dict(newAllowEmbedding=True),madeForKids=dict(operation='MDE_MADE_FOR_KIDS_UPDATE_OPERATION_SET',newMfk='MDE_MADE_FOR_KIDS_TYPE_NOT_MFK')))
+  if result.get('overallResult',{}).get('resultCode')!='UPDATE_SUCCESS' or result.get('distributionOptions',{}).get('success') is not True or result.get('madeForKids',{}).get('success') is not True:
+   raise RuntimeError('YouTube did not confirm embedding and audience settings')
  def thumbnail(self,video,settings):
   result=self.post('/video_manager/metadata_update',dict(encryptedVideoId=video,videoReadMask={},videoStill=settings['video_still']))
   if result.get('overallResult',{}).get('resultCode')!='UPDATE_SUCCESS' or result.get('videoStill',{}).get('success') is not True:
@@ -92,6 +94,8 @@ def cycle(config,root,api,epoch=None):
  active=state.get('active_video_id');wanted=target['video_id']
  # No polling is needed between boundaries once the current session is confirmed live.
  if active==wanted and target.get('state')=='live':
+  if not target.get('live_embedding_verified'):
+   api.configure(wanted);target['live_embedding_verified']=True;persist()
   if now-state.get('last_api_check',0)>=300:
    confirmed=api.status([wanted]).get(wanted,{})
    if confirmed.get('lifeCycleStatus')!='LIFE_CYCLE_LIVE':raise RuntimeError('Current session is no longer confirmed live; check YouTube Studio')
@@ -116,7 +120,8 @@ def cycle(config,root,api,epoch=None):
    if entry.get('video_id')==active:entry.update(state='complete',youtube_confirmed_complete_epoch=now)
   state['active_video_id']=None;persist()
  if new.get('lifeCycleStatus')=='LIFE_CYCLE_LIVE':
-  state['active_video_id']=wanted;target.update(state='live',confirmed_live_epoch=now);persist()
+  api.configure(wanted)
+  state['active_video_id']=wanted;target.update(state='live',confirmed_live_epoch=now,live_embedding_verified=True);persist()
  elif new.get('lifeCycleStatus') in ('LIFE_CYCLE_CREATED','LIFE_CYCLE_READY'):
   api.bind(wanted)
   if new.get('ingestionStatus')=='INGESTION_STATUS_ACTIVE':api.start(wanted)
