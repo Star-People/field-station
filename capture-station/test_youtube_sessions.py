@@ -63,3 +63,19 @@ class ThumbnailTests(SessionTests):
   from youtube_sessions import Studio
   api=Studio();api.post=lambda p,b:{'overallResult':{'resultCode':'UPDATE_FAILED'},'videoStill':{'success':False}}
   with self.assertRaises(RuntimeError):api.thumbnail('next',{'video_still':{}})
+
+class DashboardRecoveryTests(unittest.TestCase):
+ def test_status_timeout_refreshes_for_next_cycle(self):
+  from youtube_sessions import Studio
+  api=Studio();calls=[]
+  def timeout(*args):raise TimeoutError('stalled')
+  api.post=timeout;api.refresh_dashboard=lambda:calls.append('refresh')
+  with self.assertRaises(TimeoutError):api.status(['example'])
+  self.assertEqual(calls,['refresh'])
+ def test_rejected_status_does_not_reload_or_retry(self):
+  from youtube_sessions import Studio
+  api=Studio();calls=[]
+  def rejected(*args):raise RuntimeError('permission denied')
+  api.post=rejected;api.refresh_dashboard=lambda:calls.append('refresh')
+  with self.assertRaises(RuntimeError):api.status(['example'])
+  self.assertEqual(calls,[])

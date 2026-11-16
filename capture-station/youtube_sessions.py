@@ -32,8 +32,15 @@ class Studio:
     return result
    time.sleep(1)
   raise TimeoutError('YouTube Studio request timed out: '+path)
+ def refresh_dashboard(self):
+  # Refresh only after a read-only status timeout; never replay uncertain mutations.
+  script='tell application "Safari"\nactivate\nrepeat with w in windows\nrepeat with t in tabs of w\nif URL of t contains "studio.youtube.com" and URL of t contains "livestreaming" then\nset current tab of w to t\nset index of w to 1\nset URL of t to URL of t\nreturn "refreshed"\nend if\nend repeat\nend repeat\nerror "Keep a signed-in YouTube live dashboard open"\nend tell'
+  subprocess.run(['osascript','-e',script],check=True,capture_output=True,text=True,timeout=30)
  def status(self,ids):
-  result=self.post('/live/get_broadcast_status',dict(videoIds=ids,includeLive=True))
+  try:result=self.post('/live/get_broadcast_status',dict(videoIds=ids,includeLive=True))
+  except TimeoutError:
+   self.refresh_dashboard()
+   raise
   return {r['videoId']:r for r in result.get('broadcastStatus',[])}
  def create(self,entry,config):
   body=dict(useMasks=True,broadcastSource='BROADCAST_SOURCE_ENCODER',broadcastType='BROADCAST_SCHEDULED',videoMetadata=dict(title=entry['title'],description=config['description']+'\n\nSession: '+entry['key']+' to '+datetime.fromtimestamp(entry['end'],ZONE).isoformat()+'. Saved six-hour observation replay.',videoCategory='CATEGORY_PEOPLE',privacyStatus='PUBLIC'),videoMetadataMask=dict(setTitle=True,setDescription=True,setVideoCategory=True,setPrivacyStatus=True),broadcastMetadata=dict(enableMonitorStream=False,scheduleMetadata=dict(scheduledStartTimeSec=int(entry['start'])),latencyMode='LATENCY_NORMAL'),broadcastMetadataMask=dict(setEnableMonitorStream=True,scheduleMetadataMask=dict(setScheduledStartTimeSec=True),setLatencyMode=True),targetEntity=dict(externalChannelId=config['channel']))
