@@ -186,3 +186,16 @@ class PhysicalPressureTests(unittest.TestCase):
             with patch.object(Path,'is_mount',return_value=True),patch.object(c.shutil,'disk_usage',side_effect=lambda p:SimpleNamespace(total=100,free=2 if str(p)==str(volume) else 80)):
                 rows=c.storage_pressure(root,cfg,False)
             self.assertTrue(next(r for r in rows if r['volume']==str(volume))['offloading']);self.assertFalse(next(r for r in rows if r['volume']==str(root))['offloading'])
+
+class JournalProtectionTests(unittest.TestCase):
+    def test_fresh_verification_rejects_review_added_after_inventory(self):
+        import sqlite3
+        with tempfile.TemporaryDirectory() as d:
+            root=Path(d);folder=root/'uap-lab/recognition/partitions';folder.mkdir(parents=True);p=folder/'1.sqlite'
+            db=sqlite3.connect(p);db.execute('CREATE TABLE frames(generation,pts)');db.execute('INSERT INTO frames VALUES(?,?)',('run-a',10));db.commit();db.close();os.utime(p,(1,1))
+            c.save(root/'capture-spool/run-a/recognition-ack.json',dict(generation='run-a',integrity_ok=True,last_pts_seconds=20))
+            manifest=root/'uap-lab/email-reviews/training-manifest.json';c.save(manifest,dict(examples=[]))
+            context=c.shard_protection_snapshot(root)
+            self.assertTrue(c.shard_eligible(root,'recognition-1',context))
+            c.save(manifest,dict(examples=[dict(generation='run-a',pts_seconds=10)]))
+            self.assertFalse(c.shard_eligible(root,'recognition-1'))

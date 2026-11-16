@@ -108,7 +108,21 @@ def eligible(root,sid,context=None):
     return True
 def shard_path(root,sid):
     return checked(root,'uap-lab/recognition/partitions/'+sid.removeprefix('recognition-')+'.sqlite')
-def shard_eligible(root,sid):
+def shard_protection_snapshot(root):
+    sessions={};reviews={}
+    for mpath in (root/'sessions').glob('*/manifest.json'):
+        m=read(mpath,{})
+        if m.get('session_media_removed'):continue
+        gen=m.get('spool_generation');segments=read(mpath.parent/'buffer-state.json',{}).get('segments',[])
+        if gen:sessions.setdefault(gen,[]).append((segments[0]['start'],segments[-1]['end']) if segments else (float('-inf'),float('inf')))
+    manifest=root/'uap-lab/email-reviews/training-manifest.json'
+    rows=read(manifest)['examples'] if manifest.exists() else (read(p,{}) for p in (root/'uap-lab/email-reviews/examples').glob('*/review.json'))
+    for r in rows:
+        if r.get('deleted') or r.get('retired'):continue
+        reviews.setdefault(r.get('generation'),[]).append(r.get('pts_seconds',-100))
+    return sessions,reviews
+
+def shard_eligible(root,sid,context=None):
     p=shard_path(root,sid)
     if not p.is_file() or time.time()-p.stat().st_mtime<120:return False
     db=sqlite3.connect(p.as_uri()+'?mode=ro',uri=True)
@@ -118,21 +132,12 @@ def shard_eligible(root,sid):
             gen=row[0];start=db.execute('SELECT min(pts) FROM frames WHERE generation=?',(gen,)).fetchone()[0];end=db.execute('SELECT max(pts) FROM frames WHERE generation=?',(gen,)).fetchone()[0];ranges.append((gen,start,end))
             row=db.execute('SELECT generation FROM frames WHERE generation>? ORDER BY generation LIMIT 1',(gen,)).fetchone()
     finally:db.close()
+    sessions,reviews=context if context is not None else shard_protection_snapshot(root)
     for gen,start,end in ranges:
         ack=read(checked(root,'capture-spool/'+gen+'/recognition-ack.json'),{})
         if not ack.get('integrity_ok') or ack.get('generation')!=gen or ack.get('last_pts_seconds',-1)<end:return False
-        for mpath in (root/'sessions').glob('*/manifest.json'):
-            m=read(mpath,{})
-            if m.get('session_media_removed') or m.get('spool_generation')!=gen:continue
-            segments=read(mpath.parent/'buffer-state.json',{}).get('segments',[])
-            if not segments or (segments[0]['start']<=end and segments[-1]['end']>=start):return False
-        manifest=root/'uap-lab/email-reviews/training-manifest.json'
-        if manifest.exists():
-            review_rows=read(manifest)['examples']
-        else:review_rows=(read(p,{}) for p in (root/'uap-lab/email-reviews/examples').glob('*/review.json'))
-        for r in review_rows:
-            if r.get('deleted') or r.get('retired'):continue
-            if r.get('generation')==gen and start-5<=r.get('pts_seconds',-100)<=end+5:return False
+        if any(lo<=end and hi>=start for lo,hi in sessions.get(gen,[])):return False
+        if any(start-5<=pts<=end+5 for pts in reviews.get(gen,[])):return False
     return bool(ranges)
 def inventory(root,sid):
     if not eligible(root,sid):raise ValueError('Session protected or analysis incomplete')
@@ -199,9 +204,10 @@ def main():
                 if len(result['candidates'])>=10:break
             if cfg.get('offload_recognition_partitions',False) and len(result['candidates'])<10:
                 result['phase']='scanning_journals';save(root/'retention/status.json',result)
+                journal_context=shard_protection_snapshot(root)
                 for p in sorted((root/'uap-lab/recognition/partitions').glob('*.sqlite')):
                     sid='recognition-'+p.stem
-                    if eligible(root,sid):result['candidates'].append(sid)
+                    if shard_eligible(root,sid,journal_context):result['candidates'].append(sid)
                     if len(result['candidates'])>=10:break
         save(root/'retention/status.json',result);print(json.dumps(result));return
     if not args.session or '/' in args.session or args.session in ('.','..'):raise ValueError('Invalid session')
