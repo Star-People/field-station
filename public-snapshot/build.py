@@ -42,8 +42,10 @@ def build(source,out,training):
   license_file=Path(__file__).parent.parent/name
   if license_file.is_file():shutil.copy2(license_file,out/name)
  for name in ('public-readonly.js','public-readonly.css'):shutil.copy2(Path(__file__).parent.parent/'public-access'/name,out/name)
+ for name in ('rf-experiment.js','rf-experiment.css'):shutil.copy2(Path(__file__).parent.parent/'uap-lab/static'/name,out/name)
  for p in (source/'pages').glob('*.html'):
   raw=p.read_text().replace('<head>','<head><script src="/snapshot.js"></script>',1)
+  if p.stem=='index':raw=raw.replace('</head>','<link rel="stylesheet" href="/rf-experiment.css"><script defer src="/rf-experiment.js"></script></head>',1)
   raw=version_assets(raw,out)
   dest=out/'index.html' if p.stem=='index' else out/p.stem/'index.html';dest.parent.mkdir(exist_ok=True);dest.write_text(raw)
  rows=json.loads((source/'objects.json').read_text());rows.sort(key=lambda r:(r.get('created',0),r['id']),reverse=True)
