@@ -12,6 +12,17 @@ def clean(v):
  if isinstance(v,str):return IPS.sub('[private address]',PATHS.sub('[private path]',v))
  return v
 
+def public_broadcasts(ledger,now):
+ sessions=ledger.get('sessions',{})
+ active=ledger.get('active_video_id')
+ valid=lambda value:isinstance(value,str) and re.fullmatch(r'[A-Za-z0-9_-]{11}',value)
+ entries=[e for e in sessions.values() if isinstance(e,dict) and valid(e.get('video_id'))]
+ confirmed=next((e for e in entries if e['video_id']==active and e.get('state')=='live'),None)
+ broadcasts=[dict(video_id=e['video_id'],start=e['start'],end=e['end']) for e in entries if e.get('end',0)>now-86400]
+ result=dict(sessions=broadcasts)
+ if confirmed:result['active_video_id']=active
+ return result
+
 def export(root,app,public):
  spec=importlib.util.spec_from_file_location('public_boundary',public/'readonly.py');mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
  files={};assets=set();failures=[]
@@ -74,9 +85,8 @@ def export(root,app,public):
  except Exception:failures.append('camera frame')
  # Only public broadcast IDs and session times leave the station.
  try:
-  sessions=json.loads((root.parent/'station-runtime/youtube/sessions.json').read_text()).get('sessions',{})
-  broadcasts=[dict(video_id=e['video_id'],start=e['start'],end=e['end']) for e in sessions.values() if re.fullmatch(r'[A-Za-z0-9_-]{11}',e.get('video_id','')) and e.get('end',0)>time.time()-86400]
-  files['responses/youtube.json']=json.dumps(dict(sessions=broadcasts)).encode()
+  ledger=json.loads((root.parent/'station-runtime/youtube/sessions.json').read_text())
+  files['responses/youtube.json']=json.dumps(public_broadcasts(ledger,time.time())).encode()
  except (OSError,ValueError,KeyError):failures.append('youtube sessions')
  files['snapshot.json']=json.dumps(dict(schema=1,captured_epoch=time.time(),objects=len(rows),unavailable=failures)).encode()
  out=io.BytesIO()
