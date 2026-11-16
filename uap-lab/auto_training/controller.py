@@ -47,6 +47,10 @@ class Controller:
   with archive.open('wb') as f:self.remote(['tar','-czf','-','-C',remote,*paths],stdout=f,timeout=300)
   with tarfile.open(archive) as tar:tar.extractall(target,filter='data')
   archive.unlink()
+  if (target/'images').is_dir():
+   from training_storage import deduplicate
+   try:deduplicate((target/'images').glob('*.png'),self.root.parent/'training-objects')
+   except BlockingIOError:pass  # The maintenance pass will deduplicate these after training.
  def run_script(self,script,args,folder):
   with (folder/(script+'.log')).open('a') as log:subprocess.run([self.c['training_python'],str(self.code/script),*map(str,args)],stdout=log,stderr=subprocess.STDOUT,check=True,timeout=3600)
  def monitor(self,folder,version,before):
@@ -148,7 +152,7 @@ class Controller:
   if not (folder/'dataset.json').exists():
    # An interrupted build cannot be mistaken for a complete immutable dataset.
    if folder.exists():folder.rename(folder.with_name(run_id+'.incomplete.'+str(time.time_ns())))
-   built=build(self.root/'baseline/dataset-001',reviews,folder,self.root/'split-ledger.json',progress=lambda message:self.mark('building',reason=message))
+   built=build(self.root/'baseline/dataset-001',reviews,folder,self.root/'split-ledger.json',progress=lambda message:self.mark('building',reason=message),image_pool=self.root.parent/'training-objects')
    built.update(training_strategy=self.c.get('training_strategy','recording_balanced'),training_recipe=self.recipe,fingerprint=hashlib.sha256((built['fingerprint']+run_key).encode()).hexdigest());save(folder/'dataset.json',built)
   dataset=read(folder/'dataset.json')
   self.run_folder=folder
