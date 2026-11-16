@@ -29,7 +29,14 @@ def build(source,out,training):
  if hash_marker not in js or pip_marker not in js:raise ValueError('Snapshot UI status contract changed')
  js=js.replace(hash_marker,hash_marker+"if(window.FIELD_PUBLIC_SNAPSHOT){if(hash)confirmedModelHash=hash;modelHash.textContent=(confirmedModelHash?confirmedModelHash.slice(0,12):'Model unavailable')+' · at snapshot';modelHash.title='Last confirmed model reported in this saved snapshot.';return;}",1)
  js=js.replace(pip_marker,pip_marker+"if(window.FIELD_PUBLIC_SNAPSHOT){badge.textContent='Snapshot';badge.dataset.state='snapshot';return;}",1)
+ js=js.replace(' let instance=null,interrupted=false,failures=0,dialog=null,focus=null;', ' if(window.FIELD_PUBLIC_SNAPSHOT)return;\n let instance=null,interrupted=false,failures=0,dialog=null,focus=null;',1)
  shell.write_text(js)
+ app=out/'app.js';js=app.read_text()
+ marker="$ ('rfStatus').textContent=".replace('$ (','$(')
+ if marker not in js:raise ValueError('RF status renderer contract changed')
+ js=js.replace(marker,marker+"window.FIELD_PUBLIC_SNAPSHOT?'Saved RF snapshot':",1)
+ js=js.replace("if(!fresh){ctx.fillStyle=palette.ink;", "if(!fresh&&!window.FIELD_PUBLIC_SNAPSHOT){ctx.fillStyle=palette.ink;")
+ app.write_text(js)
  shutil.copy2(Path(__file__).with_name('snapshot.js'),out/'snapshot.js')
  for name in ('LICENSE','LICENSE-CONTENT.txt','CONTENT-LICENSE.md','NOTICE.md','THIRD_PARTY_NOTICES.md'):
   license_file=Path(__file__).parent.parent/name
@@ -96,6 +103,7 @@ def build(source,out,training):
  sources={'detections':len(rows),'manual_recordings':manual.get('total',0)}
  write(out/'snapshot/objects.json',dict(model_sets=model_sets,fields=fields,rows=[[r.get(k) for k in fields] for r in rows],counts=counts,source_counts=sources))
  write(out/'snapshot/manual.json',manual)
+ write(out/'snapshot/camera-controls.json',json.loads((source/'camera-controls.json').read_text()) if (source/'camera-controls.json').exists() else {})
  meta=json.loads((source/'snapshot.json').read_text());meta.update(routes={},missing_thumbnails=len(missing))
  for p in (source/'responses').glob('*.json'):
   # Route names are recorded separately because hyphenated API names are legitimate.
