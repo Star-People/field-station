@@ -87,9 +87,16 @@ def cycle(config,root,api,epoch=None):
     entry.update(thumbnail_error=str(exc)[:300],thumbnail_retry_after=now+300)
    persist()
   return entry
- target=ensure(current);future=ensure(upcoming)
+ target=ensure(current);future=None
+ # Current-slot handoff takes priority over preparation of the following slot.
+ if state.get('active_video_id')==target['video_id'] and target.get('state')=='live':
+  try:
+   future=ensure(upcoming)
+   save(root/'upcoming-status.json',dict(state='ready',video_id=future['video_id'],updated_epoch=now))
+  except Exception as exc:
+   save(root/'upcoming-status.json',dict(state='retry_pending',error=str(exc),updated_epoch=now))
  if config.get('thumbnail',{}).get('revision'):
-  pending=[e['video_id'] for e in (target,future) if e.get('thumbnail_revision')!=config['thumbnail']['revision']]
+  pending=[e['video_id'] for e in (target,future) if e and e.get('thumbnail_revision')!=config['thumbnail']['revision']]
   save(root/'thumbnail-status.json',dict(state='retry_pending' if pending else 'ready',pending_video_ids=pending,updated_epoch=now))
  active=state.get('active_video_id');wanted=target['video_id']
  # No polling is needed between boundaries once the current session is confirmed live.
