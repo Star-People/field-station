@@ -100,3 +100,35 @@ class EmbeddingTests(unittest.TestCase):
    saved=json.loads((root/'sessions.json').read_text());self.assertEqual(saved['active_video_id'],'next');self.assertFalse(saved['sessions'][slot(now)['key']].get('live_embedding_verified'))
    api.configure=API.configure.__get__(api);cycle({},root,api,now+15);cycle({},root,api,now+30)
    self.assertEqual(api.calls,[('configure','next')])
+
+class RolloverPriorityTests(unittest.TestCase):
+ def test_missing_future_cannot_delay_current_handoff(self):
+  now=datetime(2026,11,11,12,tzinfo=ZONE).timestamp()
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t);s=SessionTests().state(root,now);future=slot(slot(now)['end']+1);s['sessions'].pop(future['key']);(root/'sessions.json').write_text(json.dumps(s))
+   api=API({'old':dict(lifeCycleStatus='LIFE_CYCLE_LIVE'),'next':dict(lifeCycleStatus='LIFE_CYCLE_TESTING',ingestionStatus='INGESTION_STATUS_ACTIVE')})
+   def fail(*args):raise AssertionError('Future preparation must wait until handoff completes')
+   api.create=fail;cycle({},root,api,now);self.assertEqual(api.calls,[('complete','old')])
+ def test_future_failure_does_not_skip_live_health_check(self):
+  now=datetime(2026,11,11,12,tzinfo=ZONE).timestamp()
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t);s=SessionTests().state(root,now);s['active_video_id']='next';s['sessions'][slot(now)['key']].update(state='live',live_embedding_verified=True);s['sessions'].pop(slot(slot(now)['end']+1)['key']);(root/'sessions.json').write_text(json.dumps(s))
+   api=API({'next':dict(lifeCycleStatus='LIFE_CYCLE_LIVE')})
+   def fail(*args):raise TimeoutError('Future creation timed out')
+   api.create=fail;result=cycle({},root,api,now)
+   self.assertEqual(result['last_api_check'],now)
+   self.assertEqual(json.loads((root/'session-status.json').read_text())['state'],'live')
+   self.assertIn('Future creation timed out',json.loads((root/'sessions.json').read_text())['upcoming_error'])
+
+class CreationRecoveryTests(unittest.TestCase):
+ def test_pending_creation_reuses_recovered_id_without_duplicate(self):
+  now=datetime(2026,11,11,12,tzinfo=ZONE).timestamp()
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t);s=SessionTests().state(root,now);entry=s['sessions'][slot(now)['key']];entry.pop('video_id');entry['creation_pending']=True;(root/'sessions.json').write_text(json.dumps(s))
+   api=API({'old':dict(lifeCycleStatus='LIFE_CYCLE_LIVE'),'next':dict(lifeCycleStatus='LIFE_CYCLE_TESTING',ingestionStatus='INGESTION_STATUS_ACTIVE')});api.recover=lambda e:'next'
+   result=cycle({},root,api,now);self.assertEqual(api.calls,[('complete','old')]);self.assertFalse(result['sessions'][slot(now)['key']]['creation_pending'])
+ def test_live_starting_waits_without_repeating_start(self):
+  now=datetime(2026,11,11,12,tzinfo=ZONE).timestamp()
+  with tempfile.TemporaryDirectory() as t:
+   root=Path(t);SessionTests().state(root,now);api=API({'old':dict(lifeCycleStatus='LIFE_CYCLE_COMPLETE'),'next':dict(lifeCycleStatus='LIFE_CYCLE_LIVE_STARTING')})
+   cycle({},root,api,now);self.assertEqual(api.calls,[])
