@@ -9,7 +9,7 @@ def save(path,value):
  path.parent.mkdir(parents=True,exist_ok=True);tmp=path.with_suffix('.tmp');tmp.write_text(json.dumps(value,indent=2));tmp.replace(path)
 def slot(epoch):
  local=datetime.fromtimestamp(epoch,ZONE);start=local.replace(hour=local.hour//6*6,minute=0,second=0,microsecond=0);end=start+timedelta(hours=6)
- return dict(key=start.isoformat(),start=start.timestamp(),end=end.timestamp(),title='UFO-FILES.APP NETWORK | '+start.strftime('%b %d, %Y')+' | '+start.strftime('%H:%M')+'–'+end.strftime('%H:%M')+' Pacific')
+ return dict(key=start.isoformat(),start=start.timestamp(),end=end.timestamp(),title='StarPeople.ai Network | '+start.strftime('%b %d, %Y')+' | '+start.strftime('%H:%M')+'–'+end.strftime('%H:%M')+' Pacific')
 
 class Studio:
  """Reuse the operator's signed-in Safari session; never export browser credentials."""
@@ -46,7 +46,7 @@ class Studio:
   if not video:raise RuntimeError('Created broadcast returned no identifier; reconcile before retrying')
   return video
  def configure(self,video):
-  self.post('/video_manager/metadata_update',dict(encryptedVideoId=video,videoReadMask={},madeForKids=dict(operation='MDE_MADE_FOR_KIDS_UPDATE_OPERATION_SET',newMfk='MDE_MADE_FOR_KIDS_TYPE_NOT_MFK')))
+  self.post('/video_manager/metadata_update',dict(encryptedVideoId=video,videoReadMask={},distributionOptions=dict(newAllowEmbedding=True),madeForKids=dict(operation='MDE_MADE_FOR_KIDS_UPDATE_OPERATION_SET',newMfk='MDE_MADE_FOR_KIDS_TYPE_NOT_MFK')))
  def thumbnail(self,video,settings):
   result=self.post('/video_manager/metadata_update',dict(encryptedVideoId=video,videoReadMask={},videoStill=settings['video_still']))
   if result.get('overallResult',{}).get('resultCode')!='UPDATE_SUCCESS' or result.get('videoStill',{}).get('success') is not True:
