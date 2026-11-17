@@ -97,3 +97,7 @@ body.live-mode .station-header:has(#systemTemperature) #infoToggle{margin-left:0
 #stationSettings .settings-delay{margin-top:20px}#stationSettings select{font:inherit;color:inherit;background:transparent;border:1px solid var(--line);border-radius:5px;padding:6px 8px}#stationSettings select:disabled{opacity:.5}
 
 .camera-location{position:absolute;left:max(24px,env(safe-area-inset-left));bottom:max(26px,env(safe-area-inset-bottom));z-index:4;color:#fff;font:400 12px/1.3 var(--app-font,monospace);pointer-events:none;margin:0;white-space:nowrap}.camera-location[hidden]{display:none}@media(max-width:600px){.camera-location{left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));font-size:10px}}
+
+/* Selected Star People mark inherits the adaptive header color. */
+.station-header .station-brand{position:relative;padding-left:30px}
+.station-brand-mark{position:absolute;left:0;top:1px;width:22px;height:22px;background:currentColor;mask:url('/starpeople-mark.png') center/contain no-repeat;-webkit-mask:url('/starpeople-mark.png') center/contain no-repeat}
