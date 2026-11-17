@@ -13,7 +13,7 @@ _SOURCE_COUNTS={}
 _COUNT_REFRESH=set()
 _REVISION=0
 _ERRORS={}
-VIEWS={'all','anomalous','not_anomalous','needs_review','human_reviewed','human_reviewed_anomalous'}
+VIEWS={'starred','all','anomalous','not_anomalous','needs_review','human_reviewed','human_reviewed_anomalous'}
 
 def cache_path(data):
  runtime=os.environ.get('XDG_RUNTIME_DIR')
@@ -171,9 +171,13 @@ def listing(data,view='all',before='',limit=100,wait=False,classification=None,r
   try:present=set(os.listdir(Path(data).parent/'notifications/outbox'))
   except FileNotFoundError:present=set()
   rows=[row for row in rows if row['kind']!='detection' or row['id'] in present]
+ from detection_actions import stars,canonical
+ bookmarks=stars(data)
+ rows=[dict(row,starred=canonical(row['id']) in bookmarks) for row in rows]
  if export:return [dict(row) for row in rows if row['kind'] in ('detection','review')]
  counts={v:0 for v in VIEWS}
  def matches(row,v):
+  if v=='starred':return row.get('starred',False)
   if v=='human_reviewed_anomalous':return row['human_reviewed'] and row['label']=='anomalous'
   return v=='all' or (row['human_reviewed'] if v=='human_reviewed' else (not row['human_reviewed'] and row['label']=='anomalous') if v=='needs_review' else row['label']==v)
  for row in rows:
