@@ -166,13 +166,8 @@ def _clear_backlog(data,cutoff=None):
   temporary.write_text(json.dumps(value));temporary.replace(path)
  from review_retention import load_records
  import fcntl
- def reviewed_events():
-  manifest=data/'email-reviews/training-manifest.json';examples=data/'email-reviews/examples'
-  try:
-   if examples.stat().st_mtime_ns>manifest.stat().st_mtime_ns:raise ValueError('Stale review index')
-   reviews=read(manifest,{})['examples']
-  except (OSError,KeyError,ValueError):reviews=[r for p,r in load_records(examples,'review.json')]
-  return {r.get('event_id') for r in reviews if r.get('human_confirmed') and not r.get('deleted')}
+ from backlog_safety import review_stamp, reviewed_events as safe_reviewed_events, bookmark_lease, protected as safety_protected
+ def reviewed_events():return safe_reviewed_events(data)
  # An older index may omit a new review, but per-object locking below catches
  # that. Skipping already-known human reviews is conservative and avoids IO.
  known_reviewed={r.get('event_id') for r in read(data/'email-reviews/training-manifest.json',{}).get('examples',[]) if r.get('human_confirmed') and not r.get('deleted')}
@@ -184,11 +179,12 @@ def _clear_backlog(data,cutoff=None):
  cached_stamp=object();reviewed=set();manifest=reviews/'training-manifest.json'
  with (audit/'actions.jsonl').open('a') as log:
   for row in candidates:
-   with (reviews/'review.lock').open('a') as lock:
+   with bookmark_lease(data), (reviews/'review.lock').open('a') as lock:
     fcntl.flock(lock,fcntl.LOCK_EX)
-    current_stamp=manifest.stat().st_mtime_ns if manifest.exists() else None
+    current_stamp=review_stamp(data)
     if current_stamp!=cached_stamp:reviewed=reviewed_events();cached_stamp=current_stamp
     key=row['id']
+    if safety_protected(data,row):protected.append(key);continue
     if row['kind']=='video':
      target=data/'videos'/key;meta=read(target/'video.json',{});review=read(target/'review.json',{})
      if meta.get('created',0)>cutoff:continue
