@@ -38,33 +38,27 @@
  for(const id of ['notice','queueToast']){const node=document.getElementById(id);if(node)mount(node);}
  const prior=document.getElementById('notice');if(prior?.textContent.startsWith('Connection')){set('stationConnectionNotice','Connection is slow. Waiting for the station…',true);prior.textContent='';}
 })();
-// Keep the current document and unsaved controls intact across service restarts.
+// Preserve the review document, playback and drafts during service recovery.
 (()=>{
- let instance=null,interrupted=false,failures=0,dialog=null,focus=null;
- function show(title,message){
-  if(!dialog){dialog=document.createElement('dialog');dialog.id='stationMaintenance';dialog.setAttribute('aria-labelledby','stationMaintenanceTitle');dialog.innerHTML="<div class=\"station-test-card\"><div class=\"test-grid\" aria-hidden=\"true\"></div>\n<div class=\"test-bars test-bars-top\" aria-hidden=\"true\"></div><div class=\"test-bars test-bars-bottom\" aria-hidden=\"true\"></div>\n<div class=\"test-ring\" aria-hidden=\"true\"><span class=\"test-cross test-cross-h\"></span><span class=\"test-cross test-cross-v\"></span></div>\n<div class=\"test-message\"><div class=\"test-portrait\" aria-hidden=\"true\"><img class=\"test-emblem\" fetchpriority=\"high\" src=\"/ufo-engraving.png?v=original-restored-10\" alt=\"\"></div><strong id=\"stationMaintenanceTitle\" role=\"heading\" aria-level=\"1\">WE'LL BE RIGHT BACK</strong><span class=\"test-standby maintenance-description\" id=\"stationMaintenanceMessage\">Checking station status\u2026</span></div>\n<svg class=\"test-grain\" aria-hidden=\"true\" focusable=\"false\" xmlns=\"http://www.w3.org/2000/svg\"><defs><filter id=\"maintenance-grain\"><feTurbulence type=\"fractalNoise\" baseFrequency=\".8\" numOctaves=\"1\" stitchTiles=\"stitch\"/><feColorMatrix type=\"saturate\" values=\"0\"/><feComponentTransfer><feFuncA type=\"linear\" slope=\"0\" intercept=\"1\"/></feComponentTransfer></filter></defs><rect width=\"100%\" height=\"100%\" filter=\"url(#maintenance-grain)\"/></svg></div>";dialog.addEventListener('cancel',e=>e.preventDefault());document.body.append(dialog);}
-  dialog.querySelector('#stationMaintenanceTitle').textContent=title==='Cleanup in progress'?'CLEANUP IN PROGRESS':"WE'LL BE RIGHT BACK";dialog.querySelector('#stationMaintenanceMessage').textContent=message;
-  if(!dialog.open){focus=document.activeElement;dialog.showModal();}
- }
- function connectionWarning(visible){
-  if(visible)window.stationNotifications.set('stationConnectionNotice','Connection is slow. Waiting for the station…',true);
-  else window.stationNotifications.clear('stationConnectionNotice');
- }
-
+ let instance=null,interrupted=false,failures=0;
+ function warning(message){window.stationNotifications.set('stationConnectionNotice',message,true);}
  async function poll(){
   try{
    const response=await fetch('/api/service-status',{cache:'no-store',priority:'high',signal:AbortSignal.timeout(window.FIELD_PUBLIC_READ_ONLY===true?45000:8000)});
-   if(!response.ok)throw Error('Unavailable');const state=await response.json();failures=0;connectionWarning(false);
-   if(!state.available){interrupted=true;show(state.title,state.message);}
-   else{
+   if(!response.ok)throw Error('Unavailable');const state=await response.json();
+   if(!state.available){
+    interrupted=true;
+    if(++failures>=2||state.phase==='cleanup')warning(state.phase==='cleanup'?'Backlog cleanup is in progress. Waiting for the station…':'Reconnecting to the station…');
+   }else{
     if(interrupted||(instance&&instance!==state.instance)){
+     // Retry authorization without replacing the page or losing unsaved work.
      const r=await fetch('/api/labeled-frames/token',{cache:'no-store',priority:'high',signal:AbortSignal.timeout(window.FIELD_PUBLIC_READ_ONLY===true?45000:8000)});if(!r.ok)throw Error('Not ready');const auth=await r.json();
      window.dispatchEvent(new CustomEvent('station-reconnected',{detail:{token:auth.token}}));
-     if(dialog?.open){dialog.close();focus?.focus();}interrupted=false;
+     interrupted=false;
     }
-    instance=state.instance;
+    instance=state.instance;failures=0;window.stationNotifications.clear('stationConnectionNotice');
    }
-  }catch{if(++failures>=2)connectionWarning(true);}
+  }catch{interrupted=true;if(++failures>=2)warning('Reconnecting to the station…');}
   setTimeout(poll,2500);
  }
  poll();
