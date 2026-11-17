@@ -99,3 +99,6 @@ body.live-mode .station-header:has(#systemTemperature) #infoToggle{margin-left:0
 .camera-location{position:absolute;left:max(24px,env(safe-area-inset-left));bottom:max(26px,env(safe-area-inset-bottom));z-index:4;color:#fff;font:400 12px/1.3 var(--app-font,monospace);pointer-events:none;margin:0;white-space:nowrap}.camera-location[hidden]{display:none}@media(max-width:600px){.camera-location{left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));font-size:10px}}
 
 /* Selected Star People mark inherits the adaptive header color. */
+
+.detection-star{position:absolute;top:8px;right:8px;z-index:3;width:32px;height:32px;padding:0;border:0;border-radius:50%;background:#080d11d9;color:#fff;font:24px/1 sans-serif;cursor:pointer}
+.detection-star[aria-pressed="true"]{color:#ffd970}
