@@ -75,6 +75,15 @@ class Handler(BaseHTTPRequestHandler):
             if p=='/api/ce5':
                 from ce5_audio import player
                 self.json(player(lab.DATA.parent).status());return
+            if p=='/api/model-inspector':
+                import model_settings,detection_settings
+                value=model_settings.state(lab.DATA);value.update(token=TOKEN,detection_settings=detection_settings.state(lab.DATA));self.json(value);return
+            if p=='/api/detection-settings':
+                import detection_settings
+                self.json(detection_settings.state(lab.DATA));return
+            if p=='/api/detection-preview':
+                import detection_preview
+                self.json(detection_preview.status(q.get('key',[''])[0]));return
             if p=='/api/training-control':
                 from auto_training.manual_training import Control
                 self.json(Control().status());return
@@ -212,7 +221,7 @@ class Handler(BaseHTTPRequestHandler):
                     content=('<!doctype html><meta name="viewport" content="width=device-width"><title>Lab output files</title><style>body{background:#10191e;color:#e8eef0;font:17px system-ui;padding:24px}a{color:#92ded0}li{margin:12px}</style><h1>Output files</h1><ul>'+''.join('<li><a href="'+base+quote(v.name)+('/' if v.is_dir() else '')+'">'+html.escape(v.name)+('/' if v.is_dir() else '')+'</a></li>' for v in files)+'</ul>').encode()
                     self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.send_header('Content-Length',str(len(content)));self.end_headers();self.wfile.write(content);return
                 self.file(path);return
-            names={'/starpeople-mark.png':'starpeople-mark.png','/favicon.png':'favicon.png','/rf-experiment.js':'rf-experiment.js','/rf-experiment.css':'rf-experiment.css','/review-filters.js':'review-filters.js','/review-filters.css':'review-filters.css','/ce5.js':'ce5.js','/models':'models.html','/models.js':'models.js','/models.css':'models.css','/models-data.js':'models-data.js','/test-model':'model-tests.html','/model-tests.js':'model-tests.js','/ufo-engraving.png':'ufo-engraving.png','/metrics':'observation-metrics.html','/observation-metrics.js':'observation-metrics.js','/observation-metrics.css':'observation-metrics.css','/metrics.js':'metrics.js','/label-videos':'label-videos.html','/detections.js':'detections.js','/label-videos.js':'label-videos.js','/app-shell.js':'app-shell.js','/app-shell.css':'app-shell.css','/email-review':'email-review.html','/email-review.js':'email-review.js','/labels':'labels.html','/labels.js':'labels.js','/':'index.html','/events':'events.html','/events.js':'events.js','/tracks':'tracks.html','/tracks.js':'tracks.js','/app.js':'app.js','/style.css':'style.css'}
+            names={'/model-inspector.css':'model-inspector.css','/model-inspector.js':'model-inspector.js','/model-score-history.js':'model-score-history.js','/starpeople-mark.png':'starpeople-mark.png','/favicon.png':'favicon.png','/rf-experiment.js':'rf-experiment.js','/rf-experiment.css':'rf-experiment.css','/review-filters.js':'review-filters.js','/review-filters.css':'review-filters.css','/ce5.js':'ce5.js','/models':'models.html','/models.js':'models.js','/models.css':'models.css','/models-data.js':'models-data.js','/test-model':'model-tests.html','/model-tests.js':'model-tests.js','/ufo-engraving.png':'ufo-engraving.png','/metrics':'observation-metrics.html','/observation-metrics.js':'observation-metrics.js','/observation-metrics.css':'observation-metrics.css','/metrics.js':'metrics.js','/label-videos':'label-videos.html','/detections.js':'detections.js','/label-videos.js':'label-videos.js','/app-shell.js':'app-shell.js','/app-shell.css':'app-shell.css','/email-review':'email-review.html','/email-review.js':'email-review.js','/labels':'labels.html','/labels.js':'labels.js','/':'index.html','/events':'events.html','/events.js':'events.js','/tracks':'tracks.html','/tracks.js':'tracks.js','/app.js':'app.js','/style.css':'style.css'}
             names.update({name:name.lstrip('/') for name in ['/fonts/IBMPlexMono-Regular.woff2', '/fonts/IBMPlexMono-SemiBold.woff2', '/fonts/IBMPlexMono-Bold.woff2']})
             if p in names:self.file(lab.ROOT/'static'/names[p]);return
             self.send_error(404)
@@ -224,6 +233,25 @@ class Handler(BaseHTTPRequestHandler):
             origin=self.headers.get('Origin')
             if self.headers.get('X-Lab-Token')!=TOKEN or (origin and urlsplit(origin).netloc!=self.headers.get('Host')):self.json(dict(error='Reload this page to reconnect securely.'),403);return
             p=urlsplit(self.path);length=int(self.headers.get('Content-Length','0'))
+            if p.path in ('/api/model-settings','/api/detection-settings','/api/detection-preview','/api/model-decision-preview','/api/model-decision-preview/review'):
+                if length>1024*1024:raise ValueError('Request too large')
+                value=json.loads(self.rfile.read(length))
+                if p.path=='/api/model-settings':
+                    import model_settings
+                    result=model_settings.update(lab.DATA,value)
+                elif p.path=='/api/detection-settings':
+                    import detection_settings
+                    result=detection_settings.update(lab.DATA,value)
+                elif p.path=='/api/detection-preview':
+                    import detection_preview
+                    result=detection_preview.request(lab.DATA,value)
+                elif p.path=='/api/model-decision-preview':
+                    import model_decision_preview
+                    result=model_decision_preview.preview(lab.DATA,value)
+                else:
+                    from review_preview import save_correction
+                    result=save_correction(lab.DATA,value)
+                self.json(result);return
             if p.path=='/api/backlog/clear':
                 if length>1024:raise ValueError('Request too large')
                 if length:self.rfile.read(length)

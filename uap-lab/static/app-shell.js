@@ -66,7 +66,7 @@
 
 // Manual requests share the scheduled trainer and its model validation gates.
 (()=>{
- if(!['/label-videos','/models'].includes(location.pathname)||window.FIELD_PUBLIC_READ_ONLY===true)return;
+ if(!['/label-videos','/models','/metrics'].includes(location.pathname)||window.FIELD_PUBLIC_READ_ONLY===true)return;
  const button=document.createElement('button');button.type='button';button.id='trainNow';button.className='station-train-button';button.textContent='Train now';button.disabled=true;
  document.querySelector('.station-header').append(button);
  const notice=document.createElement('div');notice.className='station-training-notice';notice.setAttribute('role','status');notice.hidden=true;window.stationNotifications.mount(notice);
@@ -79,9 +79,9 @@
  window.addEventListener('station-reconnected',poll);poll();setInterval(poll,5000);
 })();
 
-// Clear analysis and review backlogs from Review detections only.
+// Shared operator actions on review, model tuning and metrics pages.
 (()=>{
- if(location.pathname!=='/label-videos'||window.FIELD_PUBLIC_READ_ONLY===true)return;
+ if(!['/label-videos','/models','/metrics'].includes(location.pathname)||window.FIELD_PUBLIC_READ_ONLY===true)return;
  const button=document.createElement('button');button.id='clearBacklog';button.type='button';button.className='station-train-button';button.textContent='Clear backlog';button.title='Skip queued analysis to live and delete unreviewed detections and their media. Human-reviewed evidence is preserved.';
  document.querySelector('.station-header').append(button);
  const style=document.createElement('style');style.textContent='.station-header #clearBacklog{margin-left:0;white-space:nowrap}.station-header:has(#clearBacklog) #trainNow{margin-left:auto}@media(max-width:600px){.station-header:has(#clearBacklog) .station-page-title{display:none}.station-header:has(#trainNow):has(#clearBacklog) .station-brand{display:none}}';document.head.append(style);
@@ -97,9 +97,9 @@
  window.addEventListener('station-reconnected',poll);poll();setInterval(poll,3000);
 })();
 
-// Operator capture control is available only on the private review screen.
+// Capture controls stay private across the operator workspaces.
 (()=>{
- if(location.pathname!=='/label-videos'||window.FIELD_PUBLIC_READ_ONLY===true)return;
+ if(!['/label-videos','/models','/metrics'].includes(location.pathname)||window.FIELD_PUBLIC_READ_ONLY===true)return;
  const header=document.querySelector('.station-header');if(!header)return;
  const button=document.createElement('button');button.id='pauseCapture';button.type='button';button.className='station-train-button';button.style.marginLeft='0';button.style.whiteSpace='nowrap';button.textContent='Pause capture';button.disabled=true;
  header.insertBefore(button,document.getElementById('clearBacklog'));
