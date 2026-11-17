@@ -1,10 +1,10 @@
 'use strict';
 (()=>{
- const $=id=>document.getElementById(id),views=[['all','All'],['anomalous','Anomalous'],['not_anomalous','Not Anomalous'],['needs_review','Machine-only review'],['human_reviewed','Human-reviewed'],['human_reviewed_anomalous','Human-reviewed anomalous']];
+ const $=id=>document.getElementById(id),views=[['starred','Starred'],['all','All'],['anomalous','Anomalous'],['not_anomalous','Not Anomalous'],['needs_review','Machine-only review'],['human_reviewed','Human-reviewed'],['human_reviewed_anomalous','Human-reviewed anomalous']];
  let view=new URLSearchParams(location.search).get('view')||'all',token='',cursor='',more=true,loading=false,version=0,anchor=null,draining=false;
  if(!views.some(([v])=>v===view))view='all';
  window.REVIEW_FILTERS.enableStarred(views.some(([v])=>v==='starred'));view=window.REVIEW_FILTERS.view();
- const rows=new Map(),selected=new Set(),pending=new Map(),deleting=new Set(),deletedIds=new Set(),dismissed=new Set(),prefix='field-station.object-review.';
+ const rows=new Map(),selected=new Set(),pending=new Map(),deleting=new Set(),starring=new Set(),deletedIds=new Set(),dismissed=new Set(),prefix='field-station.object-review.';
  const retainedFields=['id','kind','label','human_reviewed','created','image_url','frame_url','frame_bounds','review_url','starred','archive_url','archive_bundle_url','archive_bundle_updating'];
  function persist(item){const row=Object.fromEntries(retainedFields.filter(k=>item.row[k]!==undefined).map(k=>[k,item.row[k]]));try{localStorage.setItem(prefix+item.body.request_id,JSON.stringify({...item,row,durable:undefined}));item.durable=true;return true;}catch{item.durable=false;return false;}}
  function forget(key){try{localStorage.removeItem(key);}catch{}}
@@ -21,7 +21,7 @@
  function fail(item,message){item.failed=true;item.error=message;persist(item);restore(item);}
  function matches(row){return window.REVIEW_FILTERS.matches(row);}
  function selection(){
-  const cards=new Map([...$('detectionQueue').children].map(n=>[n.dataset.id,n]));for(const [id,row] of rows){const card=cards.get(id);if(!card)continue;card.classList.toggle('selected',selected.has(id));const checkbox=card.querySelector('.frame-select');if(checkbox)checkbox.checked=selected.has(id);card.querySelectorAll('button,input').forEach(b=>b.disabled=b.dataset.bundleUpdating==='true'||saving(id)||deleting.has(id));}
+  const cards=new Map([...$('detectionQueue').children].map(n=>[n.dataset.id,n]));for(const [id,row] of rows){const card=cards.get(id);if(!card)continue;card.classList.toggle('selected',selected.has(id));const checkbox=card.querySelector('.frame-select');if(checkbox)checkbox.checked=selected.has(id);card.querySelectorAll('button,input').forEach(b=>b.disabled=b.dataset.bundleUpdating==='true'||saving(id)||deleting.has(id)||starring.has(id));}
   $('bulkReview').hidden=!selected.size;$('selectionCount').textContent=selected.size+' selected';
  }
  function select(id,event){if(saving(id)||deleting.has(id))return;const ids=[...rows.keys()],a=ids.indexOf(anchor),b=ids.indexOf(id);if(event.shiftKey&&a>=0){for(const k of ids.slice(Math.min(a,b),Math.max(a,b)+1))if(!saving(k))selected.add(k);}else{selected.has(id)?selected.delete(id):selected.add(id);anchor=id;}selection();}
@@ -53,6 +53,14 @@
   if(row.kind==='manual_recording')return manualCard(row);
   const n=el('article');n.className='detection-card';n.dataset.id=row.id;
   const image=el('button');image.className='detection-image';image.type='button';image.setAttribute('aria-label','Select '+pretty(row.label)+' object');thumbnail(image,row.image_url,pretty(row.label)+' detected object');image.onclick=e=>{select(row.id,e);n.classList.toggle('controls-open');};
+  if(window.FIELD_PUBLIC_READ_ONLY!==true){
+   const star=el('button');star.className='detection-star';star.type='button';
+   function showStar(){star.textContent=row.starred?'★':'☆';star.setAttribute('aria-pressed',String(!!row.starred));star.setAttribute('aria-label',row.starred?'Unstar frame':'Star frame');star.title=row.starred?'Unstar frame':'Star frame';}
+   showStar();star.onclick=async event=>{event.preventDefault();event.stopPropagation();if(starring.has(row.id)||saving(row.id)||deleting.has(row.id))return;const wanted=!row.starred;starring.add(row.id);selection();star.disabled=true;
+    try{const result=await api('/api/objects/star',{id:row.id,starred:wanted});if(result.starred!==wanted)throw Error('Star change was not confirmed');row.starred=result.starred;showStar();if(!matches(row)){rows.delete(row.id);selected.delete(row.id);n.remove();$('queueEmpty').hidden=rows.size>0;}notice(wanted?'Frame starred.':'Star removed.');}
+    catch(error){notice('Star needs attention: '+error.message);}finally{starring.delete(row.id);star.disabled=false;selection();}
+   };n.append(star);
+  }
   const badge=el('span',pretty(row.label)+' · '+(row.human_reviewed?'Human-reviewed':'Machine-only review'));badge.className='object-label';
   const actions=el('div');actions.className='category-actions';const grid=el('div');grid.className='category-grid';
   for(const label of ['anomalous','not_anomalous']){const b=el('button',pretty(label));b.type='button';b.setAttribute('aria-label','Label as '+pretty(label));b.onclick=()=>enqueue(row,label);grid.append(b);}
@@ -64,7 +72,7 @@
   const error=el('p');error.className='queue-error';error.setAttribute('role','status');
   if(pending.get(row.id)?.failed)error.textContent='Save needs attention: '+pending.get(row.id).error+'. Choose a label to retry.';
   actions.append(grid,links,error);const box=el('input');box.type='checkbox';box.className='frame-select';box.setAttribute('aria-label','Select object for bulk classification');box.onclick=e=>{e.stopPropagation();select(row.id,e);};
-  n.addEventListener('click',e=>{if(e.shiftKey&&!e.target.closest('a,input')){e.preventDefault();e.stopImmediatePropagation();select(row.id,e);}},true);
+  n.addEventListener('click',e=>{if(e.shiftKey&&!e.target.closest('a,input,.detection-star')){e.preventDefault();e.stopImmediatePropagation();select(row.id,e);}},true);
   n.append(image,badge,actions,box);return n;
  }
  const tabButtons=new Map(),tabCounts={};let completeCounts=false;
@@ -81,7 +89,7 @@
    const data=await api('/api/objects?'+window.REVIEW_FILTERS.query(''));if(rev!==version)return;
    refreshFailed=false;renderTabs(data.counts,(data.counts_indexing??data.indexing)||data.ready===false,data.filter_counts,data.source_counts);
    // An incomplete index is not evidence that existing cards disappeared.
-   if(data.ready===false||data.indexing||selected.size||pending.size||deleting.size||$('queueFrame').open||document.querySelector('.detection-card:hover,.controls-open')||[...$('detectionQueue').querySelectorAll('video')].some(v=>!v.paused))return;
+   if(data.ready===false||data.indexing||selected.size||pending.size||deleting.size||starring.size||$('queueFrame').open||document.querySelector('.detection-card:hover,.controls-open')||[...$('detectionQueue').querySelectorAll('video')].some(v=>!v.paused))return;
    const items=data.items.filter(row=>!deletedIds.has(row.id)&&!saving(row.id)&&!dismissed.has(row.id)),wanted=new Set(items.map(row=>row.id)),grid=$('detectionQueue'),nodes=new Map([...grid.children].map(node=>[node.dataset.id,node]));
    for(const [id,node]of nodes)if(!wanted.has(id)){node.remove();rows.delete(id);}
    for(const [index,row]of items.entries()){
@@ -127,7 +135,7 @@
  window.addEventListener('online',drain);window.addEventListener('station-reconnected',e=>{token=e.detail.token;drain();});
  setInterval(()=>{if(pending.size)drain();},5000);
  // Refresh only when idle; never replace a selection or open inspection.
- setInterval(()=>{if(!document.hidden&&!loading&&rows.size<=100&&!selected.size&&!pending.size&&!deleting.size&&!$('queueFrame').open&&window.scrollY<150&&!document.querySelector('.detection-card:hover,.controls-open'))refresh();},15000);
+ setInterval(()=>{if(!document.hidden&&!loading&&rows.size<=100&&!selected.size&&!pending.size&&!deleting.size&&!starring.size&&!$('queueFrame').open&&window.scrollY<150&&!document.querySelector('.detection-card:hover,.controls-open'))refresh();},15000);
  new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)&&rows.size)load();},{rootMargin:'200px'}).observe($('moreDetections'));
  api('/api/labeled-frames/token').then(async d=>{const cutoff=d.pending_reset?.epoch||0;let discarded=0;for(const [id,item] of pending){if(cutoff&&(!item.body.queued_at||item.body.queued_at<=cutoff)){forget(prefix+item.body.request_id);if(item.legacyKey)forget(item.legacyKey);pending.delete(id);discarded++;}}token=d.token;await reset();progress();if(discarded)notice(discarded+' pending labels discarded as requested');await drain();}).catch(e=>{notice(e.message);});
 })();
