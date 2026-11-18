@@ -79,7 +79,7 @@ def review_batch(data):
   finally:
    try:
     if state['dirty']:
-     rows=state['examples'];value=dict(updated_epoch=time.time(),examples=rows,classes=sorted({e['label'] for e in rows if e.get('multiclass_ready') and not e.get('deleted')}))
+     rows=state['examples'];value=dict(updated_epoch=time.time(),examples=[{k:v for k,v in r.items() if k!='pre_review_models'} for r in rows],classes=sorted({e['label'] for e in rows if e.get('multiclass_ready') and not e.get('deleted')}))
      temp=manifest.with_suffix('.tmp');temp.write_text(json.dumps(value,allow_nan=False));temp.replace(manifest)
    finally:del _REVIEW_BATCH.state
 
@@ -107,12 +107,15 @@ def store_review(data,record,crop_bytes):
   if state:indexed=state['examples']
   target=root/'examples'/sample_id;target.mkdir(parents=True,exist_ok=True);p=target/'review.json';previous=json.loads(p.read_text()) if p.exists() else {}
   if record['reviewed_epoch']>=previous.get('reviewed_epoch',0):
+   from review_model_metrics import freeze,commit_review
+   record=freeze(data,record,previous)
    temp=target/'native-object.tmp';temp.write_bytes(crop_bytes);temp.replace(target/'native-object.png');save(p,record)
+   commit_review(data,record)
   save(audit,dict(record,previous=previous))
   if indexed is None:examples=[json.loads(p.read_text()) for p in (root/'examples').glob('*/review.json')]
   else:
    examples=[r for r in indexed if r.get('sample_id',r.get('event_id'))!=sample_id]
    examples.append(json.loads(p.read_text()))
   if state:state.update(examples=examples,dirty=True)
-  else:save(root/'training-manifest.json',dict(updated_epoch=time.time(),examples=examples,classes=sorted({e['label'] for e in examples if e.get('multiclass_ready') and not e.get('deleted')})))
+  else:save(root/'training-manifest.json',dict(updated_epoch=time.time(),examples=[{k:v for k,v in r.items() if k!='pre_review_models'} for r in examples],classes=sorted({e['label'] for e in examples if e.get('multiclass_ready') and not e.get('deleted')})))
   return 'imported'

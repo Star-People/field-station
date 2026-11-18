@@ -56,8 +56,8 @@ class Handler(BaseHTTPRequestHandler):
                 from station_settings import settings
                 self.json(settings(lab.DATA.parent));return
             if p=='/api/observation-metrics':
-                from observation_metrics import snapshot
-                self.json(dict(snapshot(lab.DATA),model_comparison=lab.read(lab.DATA/'model-comparison.json',dict(points=[]))));return
+                from observation_metrics import response
+                self.json(response(lab.DATA));return
             if p=='/api/model-metrics':
                 history=lab.read(lab.ROOT.parent/'auto-training/metrics.json',dict(points=[],updated_epoch=None))
                 releases={}
