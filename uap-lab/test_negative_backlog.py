@@ -1,8 +1,8 @@
-import json,tempfile,time,unittest
+import json,sqlite3,tempfile,time,unittest
 from pathlib import Path
 from unittest.mock import patch
 from PIL import Image
-from negative_backlog import cycle,select
+from negative_backlog import cycle,select,discovery_keys
 from retired_data import save
 
 class SampleTests(unittest.TestCase):
@@ -87,5 +87,31 @@ class CleanupTests(unittest.TestCase):
     def test_disabled_does_nothing(self):
         save(self.data/'negative-backlog-policy.json',dict(enabled=False));self.event();self.event()
         self.assertEqual(self.run_cycle(),dict(enabled=False))
+
+    def test_incomplete_index_does_not_scan_all_history_before_current_queue(self):
+        from detection_library import cache_path
+        visible='f'*32;arrival='e'*32;previous='d'*32
+        save(cache_path(self.data),dict(items=[dict(id=visible,kind='detection',label='not_anomalous',human_reviewed=False)]))
+        history=[(3000-i,f'{i+1:032x}') for i in range(2501)]
+        db=sqlite3.connect(':memory:');self.addCleanup(db.close)
+        db.execute('CREATE TABLE features(id TEXT PRIMARY KEY,stamp INTEGER,appearance TEXT)')
+        db.execute('INSERT INTO features VALUES(?,0,?)',(previous,'x'))
+        def ordered(root,boundary=None):
+            return [row for row in history if boundary is None or row<tuple(boundary)]
+        with patch('recognition.recognition_alerts.recent_detections',return_value=([dict(id=arrival,model_label='not_anomalous')],False)),patch('queue_index.ordered',side_effect=ordered):
+            first=discovery_keys(self.data,db,0);second=discovery_keys(self.data,db,0);third=discovery_keys(self.data,db,0)
+        hints={visible,arrival,previous}
+        self.assertTrue(hints<=first)
+        self.assertEqual(len(first-hints),1000);self.assertEqual(len(second-hints),1000);self.assertEqual(len(third-hints),501)
+        self.assertFalse((first-hints)&(second-hints))
+        self.assertEqual((first|second|third)-hints,{key for _,key in history})
+
+    def test_stale_cache_cannot_authorize_deleting_anomalous_or_reviewed_event(self):
+        from detection_library import cache_path
+        key,folder=self.event(classification='anomalous');reviewed,rf=self.event()
+        save(self.data/'email-reviews/training-manifest.json',dict(examples=[dict(event_id=reviewed,human_confirmed=True)]))
+        save(cache_path(self.data),dict(items=[dict(id=k,kind='detection',label='not_anomalous',human_reviewed=False) for k in [key,reviewed]]))
+        self.event();self.event();self.assertEqual(self.run_cycle()['deleted'],1)
+        self.assertTrue((folder/'native-object.png').exists());self.assertTrue((rf/'native-object.png').exists())
 
 if __name__=='__main__':unittest.main()

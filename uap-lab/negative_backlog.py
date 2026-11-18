@@ -83,13 +83,38 @@ def select(rows,limit,budget):
         groups=[g for g in groups if g]
     return seen
 
-def discover(data,reviewed,retired,cache):
+def discovery_keys(data,cache,cutoff):
+    """Prioritize the visible queue; sweep old metadata in bounded increments.
+
+    Hints only nominate IDs. Every nominated event still passes the authoritative
+    classification, review, retention and media checks before any deletion.
+    """
     from recognition.recognition_alerts import recent_detections
     from queue_index import ordered
     root=data.parent/'notifications/outbox'
-    cutoff=read(data/'review-queue-cleared.json',{}).get('cutoff_epoch',float('-inf'))
     arrivals,complete=recent_detections(root,cutoff)
-    keys=[r['id'] for r in arrivals if r.get('model_label')=='not_anomalous'] if complete else [key for _,key in ordered(root)]
+    keys={r['id'] for r in arrivals if r.get('model_label')=='not_anomalous'}
+    if not complete:
+        from detection_library import cache_path
+        # The UI cache is advisory, never a source of deletion authorization.
+        try:rows=read(cache_path(data),{}).get('items',[])
+        except (OSError,ValueError):rows=[]
+        keys.update(r['id'] for r in rows if r.get('kind')=='detection' and not r.get('human_reviewed') and r.get('label')=='not_anomalous')
+        keys.update(r[0] for r in cache.execute('SELECT id FROM features'))
+        cache.execute('CREATE TABLE IF NOT EXISTS discovery_cursor (id INTEGER PRIMARY KEY, boundary TEXT)')
+        old=cache.execute('SELECT boundary FROM discovery_cursor WHERE id=1').fetchone()
+        boundary=json.loads(old[0]) if old and old[0] else None
+        history=ordered(root,boundary)
+        batch=history[:1000]
+        keys.update(key for _,key in batch)
+        cursor=json.dumps(batch[-1]) if len(history)>len(batch) else None
+        cache.execute('INSERT OR REPLACE INTO discovery_cursor VALUES(1,?)',(cursor,))
+    return keys
+
+def discover(data,reviewed,retired,cache):
+    root=data.parent/'notifications/outbox'
+    cutoff=read(data/'review-queue-cleared.json',{}).get('cutoff_epoch',float('-inf'))
+    keys=discovery_keys(data,cache,cutoff)
     pending={p.stem for p in (data/'negative-backlog-pending').glob('*.json')}
     keys=sorted(set(keys)|pending)
     active={r.get('id') for r in read(root/'producer-state.json',{}).get('groups',[])}
