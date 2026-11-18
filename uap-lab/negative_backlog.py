@@ -117,29 +117,43 @@ def discover(data,reviewed,retired,cache):
     keys=discovery_keys(data,cache,cutoff)
     pending={p.stem for p in (data/'negative-backlog-pending').glob('*.json')}
     keys=sorted(set(keys)|pending)
-    active={r.get('id') for r in read(root/'producer-state.json',{}).get('groups',[])}
+    # Published groups remain tracked for deduplication, but submit() never
+    # writes their media again. Only unpublished groups are in-flight writes.
+    active={r.get('id') for r in read(root/'producer-state.json',{}).get('groups',[]) if not r.get('notified')}
+    cache.execute('CREATE TABLE IF NOT EXISTS inventory(id TEXT PRIMARY KEY, stamp INTEGER, row TEXT)')
     result=[];errors=[]
     for key in keys:
         if not re.fullmatch('[a-f0-9]{32}',key) or key in reviewed or (key in retired and key not in pending) or key in active:continue
         folder=root/key
         try:
+            # Planning cache only. All deletion guards are reread under locks.
+            # Atomic event/annotation/media updates change the directory stamp.
+            stamp=folder.stat().st_mtime_ns
+            cached=cache.execute('SELECT stamp,row FROM inventory WHERE id=?',(key,)).fetchone()
+            if key not in pending and cached and cached[0]==stamp:
+                row=json.loads(cached[1])
+                if row['created']>cutoff:result.append(row)
+                continue
             event=read(folder/'event.json')
             if not event or not candidate(event) or event.get('created_epoch',0)<=cutoff:continue
             if read(folder/'label-queue-dismissed.json',{}).get('dismissed') and key not in pending:continue
-            if protected(data,dict(kind='detection',id=key)):continue
+            # Protection is authoritative at deletion time, not an expensive
+            # repeated probe of missing files for every retained candidate.
             paths=files(data,key);size=sum(p.stat().st_size for p in paths)
             if key in pending:
                 result.append(dict(id=key,created=event['created_epoch'],captured=event.get('detected_epoch',event['created_epoch']),bytes=size,uncertainty=0,appearance='pending',resume=True))
                 continue
             if not paths:continue
-            native=folder/event.get('native_crop','native-object.png');stamp=native.stat().st_mtime_ns
+            native=folder/event.get('native_crop','native-object.png');image_stamp=native.stat().st_mtime_ns
             old=cache.execute('SELECT stamp,appearance FROM features WHERE id=?',(key,)).fetchone()
-            appearance=old[1] if old and old[0]==stamp else features(folder,event)
-            if not old or old[0]!=stamp:cache.execute('INSERT OR REPLACE INTO features VALUES(?,?,?)',(key,stamp,appearance))
+            appearance=old[1] if old and old[0]==image_stamp else features(folder,event)
+            if not old or old[0]!=image_stamp:cache.execute('INSERT OR REPLACE INTO features VALUES(?,?,?)',(key,image_stamp,appearance))
             score=event.get('score');uncertainty=1-2*abs(score-.5) if type(score) in (int,float) and math.isfinite(score) and 0<=score<=1 else 1.
             created=float(event['created_epoch']);captured=float(event.get('detected_epoch',created))
             if not math.isfinite(created) or not math.isfinite(captured):raise ValueError('Invalid capture time')
-            result.append(dict(id=key,created=created,captured=captured,bytes=size,uncertainty=uncertainty,appearance=appearance))
+            row=dict(id=key,created=created,captured=captured,bytes=size,uncertainty=uncertainty,appearance=appearance)
+            result.append(row)
+            cache.execute('INSERT OR REPLACE INTO inventory VALUES(?,?,?)',(key,stamp,json.dumps(row)))
         except (OSError,ValueError,KeyError) as exc:errors.append(dict(id=key,error=str(exc)))
     cache.commit()
     return result,errors
@@ -195,7 +209,7 @@ def run(data,settings,now,apply):
                         event=read(folder/'event.json',{})
                         if not candidate(event) or now-event.get('created_epoch',now)<settings['grace_seconds']:continue
                         if read(data/'review-leases.json',{}).get(key,0)>time.time():result['deferred']+=1;continue
-                        if key in {g.get('id') for g in read(root/'producer-state.json',{}).get('groups',[])}:continue
+                        if key in {g.get('id') for g in read(root/'producer-state.json',{}).get('groups',[]) if not g.get('notified')}:continue
                         paths=files(data,key)
                         # Publish exclusion before removing media; cached lists honor tombstones.
                         current=read(data/'retired-objects.json',{});events=set(current.get('events',[]));events.add(key)

@@ -88,6 +88,34 @@ class CleanupTests(unittest.TestCase):
         save(self.data/'negative-backlog-policy.json',dict(enabled=False));self.event();self.event()
         self.assertEqual(self.run_cycle(),dict(enabled=False))
 
+    def test_unchanged_inventory_is_reused_but_new_media_is_counted(self):
+        key,folder=self.event();self.event()
+        first=self.run_cycle(False)
+        with patch('negative_backlog.files',side_effect=AssertionError('Unchanged media rescanned')):
+            second=self.run_cycle(False)
+        self.assertEqual(first['eligible_bytes'],second['eligible_bytes'])
+        (folder/'extra.mp4').write_bytes(b'additional-media')
+        self.assertEqual(self.run_cycle(False)['eligible_bytes'],first['eligible_bytes']+len(b'additional-media'))
+
+    def test_cached_negative_never_authorizes_deleting_changed_prediction(self):
+        key,folder=self.event();self.event();self.run_cycle(False)
+        # In-place writes need not change the directory stamp. The final guard
+        # must still read the authoritative event rather than trust inventory.
+        path=folder/'event.json';event=json.loads(path.read_text());event['classification']='anomalous';path.write_text(json.dumps(event))
+        self.run_cycle();self.assertTrue((folder/'native-object.png').exists())
+
+    def test_cached_candidate_remains_protected_by_new_human_review(self):
+        key,folder=self.event();self.event();self.run_cycle(False)
+        save(self.data/'email-reviews/training-manifest.json',dict(examples=[dict(event_id=key,human_confirmed=True)]))
+        self.run_cycle();self.assertTrue((folder/'native-object.png').exists())
+
+    def test_published_tracking_groups_count_toward_cap_but_unfinished_work_is_protected(self):
+        published,pf=self.event();self.event();unfinished,uf=self.event()
+        save(self.data.parent/'notifications/outbox/producer-state.json',dict(groups=[dict(id=published,notified=True),dict(id=unfinished,notified=False)]))
+        result=self.run_cycle()
+        self.assertEqual(result['eligible'],2);self.assertEqual(result['deleted'],1)
+        self.assertFalse((pf/'native-object.png').exists());self.assertTrue((uf/'native-object.png').exists())
+
     def test_incomplete_index_does_not_scan_all_history_before_current_queue(self):
         from detection_library import cache_path
         visible='f'*32;arrival='e'*32;previous='d'*32
