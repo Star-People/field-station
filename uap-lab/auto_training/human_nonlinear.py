@@ -7,7 +7,7 @@ ARCHITECTURE='MobileNetV3 Small frozen RGB features + normalized 64-unit nonline
 THRESHOLD=.78
 RECIPES={
  'human_nonlinear_v1':dict(width=64,epochs=40,positive_mass=.5,threshold=.78),
- 'human_nonlinear_v2':dict(width=128,epochs=60,positive_mass=.25,threshold=.6),
+ 'human_nonlinear_v2':dict(width=128,epochs=60,positive_mass=.25,threshold=.43),
 }
 
 def recipe_config(name):

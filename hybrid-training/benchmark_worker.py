@@ -37,6 +37,22 @@ def inference_key(policy):
  color=policy.get('color_decision',{})
  return json.dumps(dict(version=policy['version'],scope='review-box-v1',color=color if color.get('color_evidence') else None),sort_keys=True)
 
+def previous_scores(root,previous,policy):
+ """Reuse verified probabilities only for the same pixels and inference policy."""
+ if previous.get('state')!='complete':return {}
+ run=Path(previous.get('run','/nonexistent'))
+ if not run.resolve().is_relative_to((Path(root)/'runs').resolve()):return {}
+ contracts=read(run/'inference-contracts.json',{})
+ lane=next((lane for lane,key in contracts.items() if key==inference_key(policy)),None)
+ if lane is None:return {}
+ samples=read(run/'live-sample.json',{}).get('samples',[]);pixels={r['origin']:r['pixel_sha256'] for r in samples};scores={}
+ for path in sorted((run/lane).glob('*.json')):
+  for prediction in read(path)['predictions']:
+   origin=prediction['origin'];score=prediction['score']
+   if origin not in pixels or not isinstance(score,(int,float)) or not 0<=score<=1:raise ValueError('Invalid cached benchmark probability')
+   scores[(origin,pixels[origin])]=score
+ return scores
+
 def cycle(config,force=False):
  root=Path(config['root']);human_root=Path(config['human_root']);code=Path(config['code'])
  verify_storage(root,config)
@@ -62,6 +78,7 @@ def cycle(config,force=False):
   if not force and same and previous.get('state')=='complete':sync(config);return
   resume=same and previous.get('state') in ('evaluating','retry_pending') and Path(previous.get('run','/nonexistent')).is_dir()
   run=Path(previous['run']) if resume else root/'runs'/uuid.uuid4().hex;run.mkdir(parents=True,exist_ok=True)
+  save(run/'inference-contracts.json',{lane:inference_key(policy) for lane,policy in policies.items()})
   started=previous.get('started_epoch',time.time()) if resume else time.time();last_publish=0
   def progress(stage,completed,total,lane=None,**extra):
    nonlocal last_publish
@@ -93,11 +110,14 @@ def cycle(config,force=False):
    for lane,folder in models.items():
     policy=policies[lane];version=policy['version'];compiled=root/'compiled'/(version+'.mlmodelc');compiled.parent.mkdir(exist_ok=True)
     if not compiled.exists():subprocess.run([str(tools/'compile_model'),str(folder/'candidate.mlpackage'),str(compiled)],check=True,capture_output=True,timeout=300)
-    parts=[]
+    parts=[];prior_scores=previous_scores(root,previous,policy)
     with CropClassifier(tools/'crop_worker',compiled,version,timeout=120) as classifier:
      for start in range(0,len(eligible),BATCH):
       chunk=eligible[start:start+BATCH];path=run/lane/f'{start:07d}.json';result=read(path)
       key=(inference_key(policy),start)
+      if result is None and all((row['origin'],row['pixel_sha256']) in prior_scores for row in chunk):
+       predictions=[dict(scores={'anomalous':prior_scores[(row['origin'],row['pixel_sha256'])],'not_anomalous':1-prior_scores[(row['origin'],row['pixel_sha256'])]}) for row in chunk]
+       result=score(chunk,predictions,policy);save(path,result)
       if result is None and key in inference_cache:
        predictions=[dict(scores={'anomalous':r['score'],'not_anomalous':1-r['score']}) for r in inference_cache[key]['predictions']]
        result=score(chunk,predictions,policy);save(path,result)

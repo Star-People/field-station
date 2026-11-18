@@ -17,20 +17,27 @@ Six recipes were compared across five recording-group folds. Each rotation used 
 
 These are historical cross-validation results used for recipe development, not a frozen external test. Seed 947 corroborates the direction but shows meaningful variation. Do not substitute training accuracy for deployment generalization.
 
-The final fit preserves all 115,336 human examples in its dataset manifest; four conflicting examples are excluded from fitting. The operating thresholds are 0.60 for Stable and 0.70 for Experimental. On the same 112,689 images scored in the preceding evaluation:
+The final fit preserves all 115,336 human examples in its dataset manifest; four conflicting examples are excluded from fitting. The final operating thresholds are 0.43 for Stable and 0.60 for Experimental. An additional fixed-operating-point check superseded the initial 0.60/0.70 release settings: those settings improved training replay but reduced out-of-fold recall. On the same 112,689 images scored in the preceding evaluation:
 
 | Profile | Previous TP / FP | Revised TP / FP |
 |---|---:|---:|
-| Stable | 1,275 / 1,616 | 1,282 / 567 |
-| Experimental | 1,256 / 1,093 | 1,258 / 427 |
+| Stable | 1,275 / 1,616 | 1,297 / 942 |
+| Experimental | 1,256 / 1,093 | 1,282 / 567 |
 
-This last table is training-set replay. The operating points were chosen on reviewed replay data; they are not independently calibrated probabilities. The CoreML export passed 512 checks spanning image order and score quantiles, with maximum probability drift below 0.000001. The field runtime also requires sustained healthy advancing recognition before release.
+This last table is training-set replay. The final operating points were selected using historical out-of-fold development results, not an untouched prospective test; they are not calibrated probabilities. At the fixed deployed settings, the recording-disjoint comparisons were:
+
+| Seed | Previous Stable TP / FP (0.78) | Revised Stable TP / FP (0.43) | Previous Experimental TP / FP (0.85) | Revised Experimental TP / FP (0.60) |
+|---|---:|---:|---:|---:|
+| 731 | 999 / 1,734 | 999 / 1,675 | 959 / 1,331 | 971 / 1,300 |
+| 947 | 989 / 1,595 | 996 / 1,593 | 963 / 1,160 | 964 / 1,157 |
+
+These generalization gains are modest and should not be confused with the much larger in-sample improvements. The CoreML export passed 512 checks spanning image order and score quantiles, with maximum probability drift below 0.000001. The field runtime also requires sustained healthy advancing recognition before release.
 
 ## Evaluation and automatic tuning repairs
 
 - Evaluation now canonicalizes legacy labels exactly as training does. For example, `cloud` and `star` are non-anomalous; retired landscape labels and changed pixels still fail eligibility checks. Previously, 2,647 valid legacy examples were excluded as changed labels.
 - A context revision prevents resuming stale eligibility results after this correction.
-- Stable and Experimental reuse native inference only when weights and effective color policy match; their thresholds and confusion counts remain independent.
+- Stable and Experimental reuse native inference only when weights and effective color policy match; their thresholds and confusion counts remain independent. Subsequent runs may reuse probabilities for identical pixels and inference policy, but always recheck current review eligibility.
 - Hybrid tuning now reads verified current-model benchmark predictions and excludes its fitted recording groups and pixels. Its old pre-review prediction path yielded zero eligible rows after model changes, despite having 27,444 reserved reviewed examples available.
 - Automatic tuning replays the whole-review-box classification contract. It no longer invents a minimum-size/context veto absent from that classifier, and it cannot improve false positives by reducing recall.
 
