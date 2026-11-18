@@ -95,11 +95,12 @@
  window.addEventListener('review-filter-change',()=>{view=window.REVIEW_FILTERS.view();dismissed.clear();void reset();});
 
  let refreshFailed=false;
- async function refresh(){
+ async function refresh(countsOnly=false){
   if(loading)return;loading=true;const rev=version;
   try{
    const data=await api('/api/objects?'+window.REVIEW_FILTERS.query(''));if(rev!==version)return;
    refreshFailed=false;renderTabs(data.counts,(data.counts_indexing??data.indexing)||data.ready===false,data.filter_counts,data.source_counts);
+   if(countsOnly)return;
    for(const row of data.items){const node=[...$('detectionQueue').children].find(n=>n.dataset.id===row.id);if(node?.querySelector('.object-model-results')&&JSON.stringify(rows.get(row.id)?.model_classifications)!==JSON.stringify(row.model_classifications)){node.querySelector('.object-model-results').replaceWith(modelResults(row));if(rows.has(row.id))rows.get(row.id).model_classifications=row.model_classifications;}}
    // An incomplete index is not evidence that existing cards disappeared.
    if(data.ready===false||selected.size||deleting.size||starring.size||$('queueFrame').open||document.querySelector('.detection-card:hover,.controls-open')||[...$('detectionQueue').querySelectorAll('video')].some(v=>!v.paused))return;
@@ -150,7 +151,7 @@
  window.addEventListener('online',drain);window.addEventListener('station-reconnected',e=>{token=e.detail.token;drain();});
  setInterval(()=>{if(pending.size)drain();},5000);
  // Refresh only when idle; never replace a selection or open inspection.
- setInterval(()=>{if(!document.hidden&&!loading&&rows.size<=100&&!selected.size&&!deleting.size&&!starring.size&&!$('queueFrame').open&&window.scrollY<150&&!document.querySelector('.detection-card:hover,.controls-open'))refresh();},15000);
+ setInterval(()=>{if(!document.hidden&&!loading)refresh(rows.size>100||selected.size>0||deleting.size>0||starring.size>0||$('queueFrame').open||window.scrollY>=150||!!document.querySelector('.detection-card:hover,.controls-open'));},15000);
  new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)&&rows.size)load();},{rootMargin:'200px'}).observe($('moreDetections'));
  api('/api/labeled-frames/token').then(async d=>{const cutoff=d.pending_reset?.epoch||0;let discarded=0;for(const [id,item] of pending){if(cutoff&&(!item.body.queued_at||item.body.queued_at<=cutoff)){forget(prefix+item.body.request_id);if(item.legacyKey)forget(item.legacyKey);pending.delete(id);discarded++;}}token=d.token;await reset();progress();if(discarded)notice(discarded+' pending labels discarded as requested');await drain();}).catch(e=>{notice(e.message);});
 })();
