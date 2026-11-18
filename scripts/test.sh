@@ -111,3 +111,5 @@ PYTHONPATH="capture-station:${PYTHONPATH:-}" "$PYTHON" -m unittest test_youtube_
 "$PYTHON" -m unittest discover -s uap-lab -p test_detection_actions.py
 
 node uap-lab/test_model_score_history.cjs
+
+"$PYTHON" -m unittest discover -s uap-lab -p test_benchmark_context.py

@@ -14,3 +14,10 @@ class BenchmarkTests(unittest.TestCase):
   with tempfile.TemporaryDirectory() as temporary:
    root=Path(temporary);(root/'status.json').write_text(json.dumps(dict(shadow_folder=str(root/'baseline'),shadow_seed_only=False)))
    self.assertEqual(experimental_models(dict(experimental_root=str(root))),{'experimental':root/'baseline'})
+ def test_inference_reuse_requires_identical_weights_and_enabled_color_policy(self):
+  from benchmark_worker import inference_key
+  a=dict(version='v1',thresholds={'anomalous':.6},color_decision={'color_evidence':False,'minimum_color_fraction':.2})
+  b=dict(a,thresholds={'anomalous':.7},color_decision={'color_evidence':False,'minimum_color_fraction':.5})
+  self.assertEqual(inference_key(a),inference_key(b))
+  self.assertNotEqual(inference_key(a),inference_key(dict(b,version='v2')))
+  self.assertNotEqual(inference_key(a),inference_key(dict(b,color_decision={'color_evidence':True})))
