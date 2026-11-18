@@ -139,7 +139,9 @@ def store_review(data,record,crop_bytes):
   if omitted(data,object_id):raise ValueError('Object was deleted')
   manifest=root/'training-manifest.json';examples_root=root/'examples';indexed=None
   try:
-   if not state and examples_root.stat().st_mtime_ns<=manifest.stat().st_mtime_ns:indexed=json.loads(manifest.read_text())['examples']
+   if not state and examples_root.stat().st_mtime_ns<=manifest.stat().st_mtime_ns:
+    indexed=json.loads(manifest.read_text())['examples']
+    if (root/'pending-index/enabled').exists():indexed=replay_pending_reviews(root,indexed)
   except (OSError,KeyError,ValueError):pass
   if state:indexed=state['examples']
   target=root/'examples'/sample_id;target.mkdir(parents=True,exist_ok=True);p=target/'review.json';previous=json.loads(p.read_text()) if p.exists() else {}
