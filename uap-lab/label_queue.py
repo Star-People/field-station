@@ -238,7 +238,7 @@ def review_status(data, items):
  if not isinstance(items,list) or len(items)>500:raise ValueError('Choose at most 500 queue items')
  for item in items:
   if not isinstance(item,dict) or item.get('kind') not in ('video','detection') or not re.fullmatch('[a-f0-9]{32}',str(item.get('id',''))):raise ValueError('Invalid queue item')
- data=Path(data);lease_videos(data,[item['id'] for item in items if item['kind']=='video']);examples=data/'email-reviews/examples';manifest=data/'email-reviews/training-manifest.json'
+ data=Path(data);lease_videos(data,[item['id'] for item in items]);examples=data/'email-reviews/examples';manifest=data/'email-reviews/training-manifest.json'
  try:
   index=read(manifest,{})['examples']
   if examples.stat().st_mtime_ns>manifest.stat().st_mtime_ns:raise ValueError('Stale index')
