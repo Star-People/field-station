@@ -59,6 +59,39 @@ def read_committed_review(path):
  try:return json.loads(path.read_text())
  except FileNotFoundError:return None  # Interrupted mkdir has no committed label.
 
+def replay_review_receipts(root,manifest,rows):
+ # Recovery after an interrupted batch must not reopen every historical crop.
+ # Receipts identify the changed samples; their current records are authoritative.
+ import re,os
+ stamp=manifest.stat().st_mtime_ns;changed=set()
+ with os.scandir(root/'history') as entries:
+  for entry in entries:
+   if not entry.name.endswith('.json') or entry.stat().st_mtime_ns<stamp-1000000000:continue
+   receipt=json.loads(Path(entry.path).read_text());key=receipt.get('sample_id',receipt.get('event_id'))
+   if not isinstance(key,str) or not re.fullmatch('[a-f0-9]{32}',key):raise ValueError('Invalid review recovery receipt')
+   changed.add(key)
+ if not changed:raise ValueError('Review index requires full recovery')
+ indexed={r.get('sample_id',r.get('event_id')):r for r in rows}
+ if None in indexed:raise ValueError('Legacy review index requires full recovery')
+ for key in changed:
+  current=read_committed_review(root/'examples'/key/'review.json')
+  if current is None:indexed.pop(key,None)
+  else:indexed[key]=current
+ return list(indexed.values())
+
+def replay_pending_reviews(root,rows):
+ indexed={r.get('sample_id',r.get('event_id')):r for r in rows}
+ for marker in (root/'pending-index').glob('*.json'):
+  key=marker.stem
+  import re
+  if not re.fullmatch('[a-f0-9]{32}',key):raise ValueError('Invalid pending review key')
+  current=read_committed_review(root/'examples'/key/'review.json')
+  if current is not None:indexed[key]=current
+ return list(indexed.values())
+
+def clear_pending_reviews(root):
+ for marker in (root/'pending-index').glob('*.json'):marker.unlink()
+
 @contextmanager
 def review_batch(data):
  import fcntl,time
@@ -67,8 +100,11 @@ def review_batch(data):
  with (root/'review.lock').open('a') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX);manifest=root/'training-manifest.json';examples=root/'examples';dirty=False
   try:
-   if review_index_stale(root,manifest,examples):raise ValueError('Stale index')
    rows=json.loads(manifest.read_text())['examples']
+   if (root/'pending-index/enabled').exists():
+    if any((root/'pending-index').glob('*.json')):rows=replay_pending_reviews(root,rows);dirty=True
+   elif review_index_stale(root,manifest,examples):
+    rows=replay_review_receipts(root,manifest,rows);dirty=True
   except (OSError,KeyError,ValueError):
    from concurrent.futures import ThreadPoolExecutor
    paths=[p/'review.json' for p in examples.iterdir()] if examples.exists() else []
@@ -81,6 +117,7 @@ def review_batch(data):
     if state['dirty']:
      rows=state['examples'];value=dict(updated_epoch=time.time(),examples=[{k:v for k,v in r.items() if k!='pre_review_models'} for r in rows],classes=sorted({e['label'] for e in rows if e.get('multiclass_ready') and not e.get('deleted')}))
      temp=manifest.with_suffix('.tmp');temp.write_text(json.dumps(value,allow_nan=False));temp.replace(manifest)
+     clear_pending_reviews(root)
    finally:del _REVIEW_BATCH.state
 
 def store_review(data,record,crop_bytes):
@@ -107,6 +144,7 @@ def store_review(data,record,crop_bytes):
   if state:indexed=state['examples']
   target=root/'examples'/sample_id;target.mkdir(parents=True,exist_ok=True);p=target/'review.json';previous=json.loads(p.read_text()) if p.exists() else {}
   if record['reviewed_epoch']>=previous.get('reviewed_epoch',0):
+   if (root/'pending-index/enabled').exists():save(root/'pending-index'/(sample_id+'.json'),dict(sample_id=sample_id))
    from review_model_metrics import freeze,commit_review
    record=freeze(data,record,previous)
    temp=target/'native-object.tmp';temp.write_bytes(crop_bytes);temp.replace(target/'native-object.png');save(p,record)
@@ -118,4 +156,5 @@ def store_review(data,record,crop_bytes):
    examples.append(json.loads(p.read_text()))
   if state:state.update(examples=examples,dirty=True)
   else:save(root/'training-manifest.json',dict(updated_epoch=time.time(),examples=[{k:v for k,v in r.items() if k!='pre_review_models'} for r in examples],classes=sorted({e['label'] for e in examples if e.get('multiclass_ready') and not e.get('deleted')})))
+  if not state:clear_pending_reviews(root)
   return 'imported'
