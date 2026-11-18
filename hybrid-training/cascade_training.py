@@ -31,6 +31,9 @@ def build_snapshot(cfg,cycle,lane):
   rows.append(dict(row,label_source='human' if row.get('human_confirmed') else row.get('label_source','base')));sources.append(source/row['image'])
  if lane in ('hybrid','machine'):
   corpus=Path(settings['root'])/'corpus';machine_rows=list(read(cycle['inputs'][lane],{}).values())
+  if lane=='machine':
+   reset=read(root/'corpus-reset.json',{}).get('epoch',0)
+   if reset:machine_rows=[r for r in machine_rows if r.get('admitted_epoch',r.get('preserved_epoch',0))>reset]
   machine_rows=eligible_pseudo(rows,machine_rows)
   held_out={alias for row in rows if row['split']!='train' for alias in row.get('group_aliases',[])}
   for row in machine_rows:

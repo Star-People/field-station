@@ -7,3 +7,5 @@ Hybrid continues to require teacher/student agreement before admitting machine e
 Manual cascades and the scheduled worker use the same foundation builder. Recording reservations and prospective holdouts remain excluded. Snapshot and release metadata report human and machine counts separately. Existing historical machine-only releases retain their original provenance; new releases explicitly describe the reviewed foundation. The live model is unchanged by shadow training.
 
 Reviewed labels are the reference judgments, not objective proof of an unexplained event. Full training-set comparison measures fit; independent and future reviewed recordings remain necessary to measure generalization.
+
+The initial reset discards old Machine-only generated crops and its collection pool. Historical run manifests remain provenance records, but discarded machine images cannot re-enter fitting. A reset timestamp rejects old frozen machine inputs. Collection pauses until a reviewed-only replacement has trained successfully, then starts afresh using that model. Human-reviewed crops and labels are retained.

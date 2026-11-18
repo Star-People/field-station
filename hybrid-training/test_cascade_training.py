@@ -59,3 +59,8 @@ class CascadeDatasetTests(unittest.TestCase):
    self.assertIn('email:neighbor',{r['origin'] for r in corrected['samples']})
    self.assertNotIn('human0',{r['pixel_sha256'] for r in corrected['samples']})
    self.assertEqual(len(corrected['quarantine']),2)
+   # Old frozen manifests cannot reintroduce discarded machine labels.
+   (root/'machine/corpus-reset.json').write_text(json.dumps(dict(epoch=1)))
+   reset_data=json.loads((build_snapshot(cfg,dict(cycle,id='after-reset'),'machine')/'dataset.json').read_text())
+   self.assertEqual(reset_data['pseudo_labels'],0)
+   self.assertTrue(all(r['human_confirmed'] for r in reset_data['samples']))

@@ -38,6 +38,7 @@ def finish_training(root,folder,code,human_root,state):
   with CropClassifier(tools/'crop_worker',compiled,key,timeout=120) as classifier:student_policy['night_context_confirmation']=qualify(folder,built,classifier,student_policy['thresholds']['anomalous'])
  else:student_policy['night_context_confirmation']=dict(enabled=False,reason='Machine-only model does not calibrate on human labels')
  save(folder/'candidate-policy.json',student_policy)
+ if built.get('human_grounded') and not built.get('pseudo_labels') and (root/'reset-pending.json').exists():(root/'reset-pending.json').unlink()
  state.update(phase='shadow_ready',shadow_folder=str(folder),shadow_version=key,shadow_seed_only=False,trained_epoch=time.time(),human_examples=sum(bool(row.get('human_confirmed')) for row in built['samples']));save(root/'status.json',state)
  try:
   from publish import publish
@@ -58,6 +59,7 @@ def run(c):
  with (root/'worker.lock').open('a') as lock:
   try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
   except BlockingIOError:return
+  if machine and (root/'reset-pending.json').exists():return
   state=read(root/'status.json',{});state['training_lane']=c.get('lane','hybrid');pool=read(root/'pseudo-labels.json',{});pairs=read(root/'comparisons.json',{})
   code=Path(c['code']);sys.path[:0]=[str(code/'uap-lab/auto_training'),str(code/'uap-lab'),str(code/'uap-lab/recognition')]
   if state.get('shadow_folder') and not (root/'publications'/(state['shadow_version']+'.json')).exists():
