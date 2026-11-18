@@ -92,7 +92,7 @@ class CleanupTests(unittest.TestCase):
         from detection_library import cache_path
         visible='f'*32;arrival='e'*32;previous='d'*32
         save(cache_path(self.data),dict(items=[dict(id=visible,kind='detection',label='not_anomalous',human_reviewed=False)]))
-        history=[(3000-i,f'{i+1:032x}') for i in range(2501)]
+        history=[(3000-i,f'{i+1:032x}') for i in range(251)]
         db=sqlite3.connect(':memory:');self.addCleanup(db.close)
         db.execute('CREATE TABLE features(id TEXT PRIMARY KEY,stamp INTEGER,appearance TEXT)')
         db.execute('INSERT INTO features VALUES(?,0,?)',(previous,'x'))
@@ -102,7 +102,7 @@ class CleanupTests(unittest.TestCase):
             first=discovery_keys(self.data,db,0);second=discovery_keys(self.data,db,0);third=discovery_keys(self.data,db,0)
         hints={visible,arrival,previous}
         self.assertTrue(hints<=first)
-        self.assertEqual(len(first-hints),1000);self.assertEqual(len(second-hints),1000);self.assertEqual(len(third-hints),501)
+        self.assertEqual(len(first-hints),100);self.assertEqual(len(second-hints),100);self.assertEqual(len(third-hints),51)
         self.assertFalse((first-hints)&(second-hints))
         self.assertEqual((first|second|third)-hints,{key for _,key in history})
 

@@ -105,7 +105,7 @@ def discovery_keys(data,cache,cutoff):
         old=cache.execute('SELECT boundary FROM discovery_cursor WHERE id=1').fetchone()
         boundary=json.loads(old[0]) if old and old[0] else None
         history=ordered(root,boundary)
-        batch=history[:1000]
+        batch=history[:100]
         keys.update(key for _,key in batch)
         cursor=json.dumps(batch[-1]) if len(history)>len(batch) else None
         cache.execute('INSERT OR REPLACE INTO discovery_cursor VALUES(1,?)',(cursor,))

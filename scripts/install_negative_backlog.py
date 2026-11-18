@@ -18,7 +18,7 @@ def main():
     logs=Path.home()/'Library/Logs/field-station';logs.mkdir(parents=True,exist_ok=True)
     agents=Path.home()/'Library/LaunchAgents';agents.mkdir(parents=True,exist_ok=True)
     plist=agents/(label+'.plist')
-    spec=dict(Label=label,ProgramArguments=[str(python),str(worker),'--data',str(data),'--apply','--watch'],WorkingDirectory=str(app),EnvironmentVariables={'XDG_RUNTIME_DIR':environment.get('XDG_RUNTIME_DIR',str(data.parent/'station-runtime')),'PATH':'/opt/homebrew/bin:/usr/bin:/bin','PYTHONUNBUFFERED':'1'},RunAtLoad=True,KeepAlive=True,ThrottleInterval=30,ProcessType='Background',StandardOutPath='/dev/null',StandardErrorPath=str(logs/'negative-backlog.error.log'))
+    spec=dict(Label=label,ProgramArguments=[str(python),str(worker),'--data',str(data),'--apply','--watch'],WorkingDirectory=str(app),EnvironmentVariables={'XDG_RUNTIME_DIR':environment.get('XDG_RUNTIME_DIR',str(data.parent/'station-runtime')),'PATH':'/opt/homebrew/bin:/usr/bin:/bin','PYTHONUNBUFFERED':'1'},RunAtLoad=True,KeepAlive=True,ThrottleInterval=30,ProcessType='Standard',StandardOutPath='/dev/null',StandardErrorPath=str(logs/'negative-backlog.error.log'))
     subprocess.run(['launchctl','bootout',domain+'/'+label],capture_output=True)
     for attempt in range(60):
         if subprocess.run(['launchctl','print',domain+'/'+label],capture_output=True).returncode:break
