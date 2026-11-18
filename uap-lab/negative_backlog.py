@@ -198,6 +198,8 @@ def run(data,settings,now,apply):
         with receipt.open('a') as log:
             for row in victims:
                 if result['deleted']>=250 or time.monotonic()-started>60:break
+                if not policy(data)['enabled']:
+                    result['reason']='Disabled in Settings';break
                 key=row['id'];folder=root/key
                 try:
                     with bookmark_lease(data),event_lease(folder) as available,(data/'email-reviews/review.lock').open('a') as lock:
