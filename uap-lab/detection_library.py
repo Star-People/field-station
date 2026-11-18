@@ -263,6 +263,8 @@ def label_batch(data,body):
  from email_training import review_batch
  items=body.get('items')
  if not isinstance(items,list) or not 1<=len(items)<=50 or any(not isinstance(i,dict) for i in items):raise ValueError('Choose between 1 and 50 objects')
+ from label_queue import lease_videos
+ lease_videos(data,[i['id'] for i in items if isinstance(i.get('id'),str) and re.fullmatch('[a-f0-9]{32}',i['id'])])
  results=[]
  reset_before=read(Path(data)/'review-pending-reset.json',{}).get('epoch',0)
  from review_receipts import split

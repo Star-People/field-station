@@ -97,7 +97,10 @@ class Handler(BaseHTTPRequestHandler):
             if p=='/api/objects':
                 from detection_library import listing
                 from object_model_scores import decorate
-                self.json(decorate(lab.DATA,listing(lab.DATA,q.get('view',['all'])[0],q.get('before',[''])[0],q.get('limit',['100'])[0],classification=q.get('classification',[None])[0],review_status=q.get('review_status',[None])[0])));return
+                value=listing(lab.DATA,q.get('view',['all'])[0],q.get('before',[''])[0],q.get('limit',['100'])[0],classification=q.get('classification',[None])[0],review_status=q.get('review_status',[None])[0])
+                from label_queue import lease_videos
+                lease_videos(lab.DATA,[r['id'] for r in value.get('items',[]) if r.get('kind')=='detection'])
+                self.json(decorate(lab.DATA,value));return
             if p in ('/tracks','/labels'):
                 self.send_response(302);self.send_header('Location','/label-videos');self.send_header('Content-Length','0');self.end_headers();return
             if p=='/api/label-queue':
