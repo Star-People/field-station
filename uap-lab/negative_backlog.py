@@ -183,7 +183,7 @@ def run(data,settings,now,apply):
         except BlockingIOError:return dict(result,deferred=len(victims),reason='Media maintenance busy')
         with receipt.open('a') as log:
             for row in victims:
-                if result['deleted']>=250 or time.monotonic()-started>20:break
+                if result['deleted']>=250 or time.monotonic()-started>60:break
                 key=row['id'];folder=root/key
                 try:
                     with bookmark_lease(data),event_lease(folder) as available,(data/'email-reviews/review.lock').open('a') as lock:
@@ -219,10 +219,12 @@ def main():
     data=Path(args.data)
     os.nice(10)
     while True:
+        result={}
         try:
             # Never recreate a disappeared external volume on the startup disk.
             if not data.is_dir() or not data.parent.is_mount():raise ValueError('Field volume unavailable')
-            print(json.dumps(cycle(data,args.apply)),flush=True)
+            result=cycle(data,args.apply)
+            print(json.dumps(result),flush=True)
         except Exception as exc:
             failure=dict(error=str(exc),epoch=time.time())
             print(json.dumps(failure),file=sys.stderr,flush=True)
@@ -230,6 +232,7 @@ def main():
                 if data.is_dir() and data.parent.is_mount():save(data/'negative-backlog-status.json',failure)
             except OSError:pass
         if not args.watch:break
-        time.sleep(60)
+        # Catch up without a full idle minute after a successful bounded pass.
+        time.sleep(5 if result.get('deleted',0)>0 and result.get('planned',0)>result.get('deleted',0) else 60)
 
 if __name__=='__main__':main()
