@@ -83,7 +83,7 @@ def run(c):
   backup=(Path(c['backup'])/'current').resolve();manifest=read(backup/'email-reviews/training-manifest.json',{});truth={r.get('sample_id',r['event_id']):(r['label'],r.get('reviewed_epoch',0)) for r in manifest.get('examples',[]) if r.get('human_confirmed') and not r.get('deleted')}
   reviewed.update(truth)
   for key in list(pool):
-   if not machine and (key in reviewed or pool[key]['pixel_sha256'] in human_pixels):pool.pop(key)
+   if key in reviewed or pool[key]['pixel_sha256'] in human_pixels:pool.pop(key)
   for key,row in pairs.items():
    row['truth']=truth[key][0] if key in truth and truth[key][1]>row.get('scored_epoch',float('inf')) else None
   candidates=[r['id'] for r in records if r['kind']=='detection' and not r.get('human_reviewed') and r['id'] not in reviewed and r['id'] not in pairs]
@@ -153,7 +153,7 @@ def run(c):
   save(root/'status.json',state)
   if not c.get('automatic_training_enabled',True):return
   if machine:
-   folder,blockers=machine_dataset(root,code)
+   folder,blockers=machine_dataset(root,code,human)
    if blockers:
     state.update(phase='collecting',reason='Machine-only training requires valid machine-labeled examples of both classes.',dataset_blockers=blockers);save(root/'status.json',state);return
    if time.time()-state.get('trained_epoch',0)<c.get('training_interval_seconds',86400):return
