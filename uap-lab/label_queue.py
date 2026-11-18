@@ -68,7 +68,7 @@ def lease_videos(data,keys):
  """Keep actively displayed review sources local; idle tabs expire naturally."""
  if not keys:return
  import fcntl,uuid
- data=Path(data);now=time.time();path=data/'review-leases.json'
+ data=Path(data);data.mkdir(exist_ok=True);now=time.time();path=data/'review-leases.json'
  with (data/'review-leases.lock').open('a') as lock:
   fcntl.flock(lock,fcntl.LOCK_EX)
   previous=read(path,{})
