@@ -11,12 +11,13 @@
  window.addEventListener('beforeunload',e=>{if([...pending.values()].some(i=>i.durable===false)){e.preventDefault();e.returnValue='';}});
  const pretty=label=>label==='anomalous'?'Anomalous':'Not Anomalous';
  const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
- async function api(path,body){try{const r=await fetch(path,{signal:AbortSignal.timeout(30000),...(body?{method:'POST',headers:{'Content-Type':'application/json','X-Lab-Token':token},body:JSON.stringify(body)}:{})});const d=await r.json();if(!r.ok){const error=Error(d.error||'Request failed');error.status=r.status;throw error;}return d;}catch(e){if(e.name==='AbortError'||e.name==='TimeoutError'||e instanceof TypeError){const error=Error(body?'Connection interrupted. Labels will retry; keep this page open until saves are confirmed.':'Connection to the station is delayed. Retrying automatically.');error.transient=true;throw error;}throw e;}}
+ async function api(path,body){try{const r=await fetch(path,{signal:AbortSignal.timeout(path==='/api/objects/labels'?180000:30000),...(body?{method:'POST',headers:{'Content-Type':'application/json','X-Lab-Token':token},body:JSON.stringify(body)}:{})});const d=await r.json();if(!r.ok){const error=Error(d.error||'Request failed');error.status=r.status;throw error;}return d;}catch(e){if(e.name==='AbortError'||e.name==='TimeoutError'||e instanceof TypeError){const error=Error(body?'Connection interrupted. Labels will retry; keep this page open until saves are confirmed.':'Connection to the station is delayed. Retrying automatically.');error.transient=true;throw error;}throw e;}}
  let noticeTimer;function notice(text){clearTimeout(noticeTimer);$('queueSaved').textContent=text;$('queueToast').hidden=false;if(!pending.size)noticeTimer=setTimeout(()=>{$('queueToast').hidden=true;},6000);}
  function saving(id){return pending.has(id)&&!pending.get(id).failed;}
  function progress(){if(!pending.size)return;const failed=[...pending.values()].filter(i=>i.failed).length;notice((pending.size-failed)+' waiting for confirmation'+(failed?' · '+failed+' need attention; choose a label on the returned frames to retry.':([...pending.values()].some(i=>i.durable===false)?'. Browser storage unavailable; keep this page open until saves are confirmed.':'. Labels are retained on this device.')));}
  function restore(item){dismissed.delete(item.row.id);if(!deletedIds.has(item.row.id)&&matches(item.row)&&!rows.has(item.row.id)){rows.set(item.row.id,item.row);$('detectionQueue').prepend(card(item.row));}$('queueEmpty').hidden=rows.size>0;}
  function storageFailure(message){return /\[Errno (28|69|122)\]|no space left on device|disk quota exceeded/i.test(message||'');}
+ function missingCropFailure(message){return /\[Errno 2\].*notifications\/outbox\/.*native-object\.png/i.test(message||'');}
  function retrySave(item,error,delay=30000){item.failed=false;item.error=error;item.attempts=0;item.retryAt=Date.now()+delay;persist(item);}
  function fail(item,message){item.failed=true;item.error=message;persist(item);restore(item);}
  function matches(row){return window.REVIEW_FILTERS.matches(row);}
@@ -41,6 +42,12 @@
   const state=el('span',row.state==='recording'?'Recording':row.state==='ready'?'Ready':row.state==='failed'?'Preparation needs attention':'Preparing video');state.className='manual-state';
   const duration=Number(row.duration_seconds),meta=el('p',Number.isFinite(duration)&&duration>0?Math.floor(duration/60)+'m '+Math.round(duration%60)+'s':'Manual recording');
   n.append(heading,state,meta);
+  if(row.deletion?.state){state.textContent='Deleting';n.append(el('p',row.deletion.error?'Deletion will retry: '+row.deletion.error:row.deletion.state==='removing_from_archive'?'Removing from Internet Archive…':'Deleting recording and its Internet Archive upload…'));return n;}
+  if(window.FIELD_PUBLIC_READ_ONLY!==true&&row.state!=='recording'){
+   const remove=el('button','Delete recording');remove.type='button';remove.className='delete-manual-recording';
+   remove.onclick=async()=>{if(!confirm('Delete this manual recording and remove its Internet Archive upload? Saved training frames and labels will remain.'))return;remove.disabled=true;deleting.add(row.id);try{const result=await api('/api/manual-recordings/delete',{session_id:row.session_id});row.deletion=result;const replacement=manualCard(row);n.replaceWith(replacement);notice('Deletion requested. Internet Archive removal will retry automatically until confirmed.');}catch(error){remove.disabled=false;notice('Delete needs attention: '+error.message);}finally{deleting.delete(row.id);}};
+   n.append(remove);
+  }
   if(row.video_url){const video=el('video');video.controls=true;video.playsInline=true;video.preload='none';video.src=row.video_url;video.setAttribute('aria-label','Manual recording from '+heading.textContent);n.append(video);const download=el('a','Download video');download.href=row.video_url;download.download=row.session_id+'.mp4';n.append(download);}
   else n.append(el('p',row.state==='recording'?'Video will be available when recording stops.':row.state==='failed'?'Original footage is retained.':'Preparing the full-quality video…'));
   if(row.review_url){const link=el('a','Review video');link.href=row.review_url;n.append(link);}
@@ -49,10 +56,14 @@
   if(row.upload_state&&!['verified','retaining','cleaned'].includes(row.upload_state))n.append(el('p',row.upload_state==='verifying'?'Verifying Internet Archive upload…':row.upload_state==='uploading'||row.upload_state==='completing'?'Uploading to Internet Archive…':'Preparing Internet Archive upload…'));
   return n;
  }
+ function modelResults(row){
+  const models=el('div');models.className='object-model-results';models.setAttribute('aria-label','Current model classifications');
+  for(const [lane,name] of [['human','Stable'],['experimental','Experimental'],['hybrid','Hybrid'],['machine','Machine-only']]){const result=row.model_classifications?.find(r=>r.lane===lane);const line=el('div');line.append(el('span',name),el('span',result?.state==='ready'?pretty(result.label):result?.state==='unavailable'?'Unavailable':'Pending'));line.title=result?.state==='ready'?`${result.version?.slice(0,12)} · anomaly score ${(result.anomaly_score*100).toFixed(1)}% · ${result.scope==='review_box'?'whole review box':result.scope==='detection_context'?'original detection and night context':'annotated crop'}`:'Waiting for HQ model scoring';models.append(line);}
+  return models;
+ }
  function card(row){
   if(row.kind==='manual_recording')return manualCard(row);
   const n=el('article');n.className='detection-card';n.dataset.id=row.id;
-  const image=el('button');image.className='detection-image';image.type='button';image.setAttribute('aria-label','Select '+pretty(row.label)+' object');thumbnail(image,row.image_url,pretty(row.label)+' detected object');image.onclick=e=>{select(row.id,e);n.classList.toggle('controls-open');};
   if(window.FIELD_PUBLIC_READ_ONLY!==true){
    const star=el('button');star.className='detection-star';star.type='button';
    function showStar(){star.textContent=row.starred?'★':'☆';star.setAttribute('aria-pressed',String(!!row.starred));star.setAttribute('aria-label',row.starred?'Unstar frame':'Star frame');star.title=row.starred?'Unstar frame':'Star frame';}
@@ -61,7 +72,7 @@
     catch(error){notice('Star needs attention: '+error.message);}finally{starring.delete(row.id);star.disabled=false;selection();}
    };n.append(star);
   }
-  const badge=el('span',pretty(row.label)+' · '+(row.human_reviewed?'Human-reviewed':'Machine-only review'));badge.className='object-label';
+  const image=el('button');image.className='detection-image';image.type='button';image.setAttribute('aria-label','Select '+pretty(row.label)+' object');thumbnail(image,row.image_url,pretty(row.label)+' detected object');image.onclick=e=>{select(row.id,e);n.classList.toggle('controls-open');};
   const actions=el('div');actions.className='category-actions';const grid=el('div');grid.className='category-grid';
   for(const label of ['anomalous','not_anomalous']){const b=el('button',pretty(label));b.type='button';b.setAttribute('aria-label','Label as '+pretty(label));b.onclick=()=>enqueue(row,label);grid.append(b);}
   const links=el('div');links.className='review-actions';const inspect=el('button','Inspect frame');inspect.onclick=()=>{$('queueFrameBox').hidden=true;$('queueFullFrame').onload=()=>{const b=row.frame_bounds,img=$('queueFullFrame'),box=$('queueFrameBox');if(!b)return;Object.assign(box.style,{left:(img.offsetLeft+b.x*img.clientWidth)+'px',top:(img.offsetTop+b.y*img.clientHeight)+'px',width:(b.w*img.clientWidth)+'px',height:(b.h*img.clientHeight)+'px'});box.hidden=false;};$('queueFullFrame').src=row.frame_url;$('queueVideoLink').hidden=!row.review_url;if(row.review_url)$('queueVideoLink').href=row.review_url;$('queueFrame').showModal();};links.append(inspect);
@@ -73,7 +84,8 @@
   if(pending.get(row.id)?.failed)error.textContent='Save needs attention: '+pending.get(row.id).error+'. Choose a label to retry.';
   actions.append(grid,links,error);const box=el('input');box.type='checkbox';box.className='frame-select';box.setAttribute('aria-label','Select object for bulk classification');box.onclick=e=>{e.stopPropagation();select(row.id,e);};
   n.addEventListener('click',e=>{if(e.shiftKey&&!e.target.closest('a,input,.detection-star')){e.preventDefault();e.stopImmediatePropagation();select(row.id,e);}},true);
-  n.append(image,badge,actions,box);return n;
+  const models=modelResults(row);
+  n.append(image,models,actions,box);return n;
  }
  const tabButtons=new Map(),tabCounts={};let completeCounts=false;
  function renderTabs(counts,indexing=false,filters,sources){
@@ -88,6 +100,7 @@
   try{
    const data=await api('/api/objects?'+window.REVIEW_FILTERS.query(''));if(rev!==version)return;
    refreshFailed=false;renderTabs(data.counts,(data.counts_indexing??data.indexing)||data.ready===false,data.filter_counts,data.source_counts);
+   for(const row of data.items){const node=[...$('detectionQueue').children].find(n=>n.dataset.id===row.id);if(node?.querySelector('.object-model-results')&&JSON.stringify(rows.get(row.id)?.model_classifications)!==JSON.stringify(row.model_classifications)){node.querySelector('.object-model-results').replaceWith(modelResults(row));if(rows.has(row.id))rows.get(row.id).model_classifications=row.model_classifications;}}
    // An incomplete index is not evidence that existing cards disappeared.
    if(data.ready===false||selected.size||deleting.size||starring.size||$('queueFrame').open||document.querySelector('.detection-card:hover,.controls-open')||[...$('detectionQueue').querySelectorAll('video')].some(v=>!v.paused))return;
    const items=data.items.filter(row=>!deletedIds.has(row.id)&&!saving(row.id)&&!dismissed.has(row.id)),wanted=new Set(items.map(row=>row.id)),grid=$('detectionQueue'),nodes=new Map([...grid.children].map(node=>[node.dataset.id,node]));
@@ -131,7 +144,8 @@
  $('selectAll').onclick=()=>{for(const id of rows.keys())if(!saving(id))selected.add(id);selection();};$('clearSelection').onclick=()=>{selected.clear();anchor=null;selection();};
  $('moreDetections').onclick=load;$('closeQueueFrame').onclick=()=>$('queueFrame').close();
  document.addEventListener('keydown',e=>{if(e.key==='Escape'){selected.clear();selection();return;}if(e.defaultPrevented||e.repeat||e.isComposing||e.ctrlKey||e.metaKey||e.altKey||!selected.size||e.target.closest?.('input:not([type="checkbox"]):not([type="radio"]):not([type="button"]),textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]')||document.querySelector('dialog[open],[aria-modal="true"]')||window.FIELD_PUBLIC_READ_ONLY===true)return;const index={a:0,n:1}[e.key.toLowerCase()];if(index===undefined)return;e.preventDefault();$('bulkCategories').children[index]?.click();});
- try{const keys=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i));for(const k of keys){if(k?.startsWith(prefix)||k?.startsWith('field-station.pending-label.')){try{const item=JSON.parse(localStorage.getItem(k));if(!item.row?.id||!item.body?.request_id||item.row.kind==='video')continue;if(!k.startsWith(prefix))item.legacyKey=k;if(item.failed&&storageFailure(item.error))retrySave(item,item.error,0);persist(item);pending.set(item.row.id,item);}catch{notice('A retained review could not be read. Other labels will still save.');}}}}catch{notice('Browser storage unavailable; keep this page open until saves are confirmed.');}
+ try{const keys=Array.from({length:localStorage.length},(_,i)=>localStorage.key(i));for(const k of keys){if(k?.startsWith(prefix)||k?.startsWith('field-station.pending-label.')){try{const item=JSON.parse(localStorage.getItem(k));if(!item.row?.id||!item.body?.request_id||item.row.kind==='video')continue;if(!k.startsWith(prefix))item.legacyKey=k;if(item.failed&&(storageFailure(item.error)||missingCropFailure(item.error)))retrySave(item,item.error,0);persist(item);pending.set(item.row.id,item);}catch{notice('A retained review could not be read. Other labels will still save.');}}}}catch{notice('Browser storage unavailable; keep this page open until saves are confirmed.');}
+ window.fieldReviewHasPending=()=>pending.size>0;
  window.addEventListener('station-backlog-cleared',()=>{void reset();});
  window.addEventListener('online',drain);window.addEventListener('station-reconnected',e=>{token=e.detail.token;drain();});
  setInterval(()=>{if(pending.size)drain();},5000);

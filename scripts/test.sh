@@ -79,6 +79,7 @@ PYTHONPATH=uap-lab:capture-station:shared "$PYTHON" -m unittest test_archive_lin
 "$PYTHON" -m unittest discover -s uap-lab -p 'test_observation_metrics.py'
 "$PYTHON" -m unittest discover -s uap-lab -p 'test_review_model_metrics.py'
 "$PYTHON" -m unittest discover -s uap-lab -p 'test_review_index_journal.py'
+"$PYTHON" -m unittest discover -s uap-lab -p 'test_review_receipts.py'
 "$PYTHON" -m unittest discover -s uap-lab -p 'test_review_media_location.py'
 
 "$PYTHON" -m unittest discover -s uap-lab -p 'test_review_filters.py'
@@ -117,3 +118,5 @@ PYTHONPATH="capture-station:${PYTHONPATH:-}" "$PYTHON" -m unittest test_youtube_
 node uap-lab/test_model_score_history.cjs
 
 "$PYTHON" -m unittest discover -s uap-lab -p test_benchmark_context.py
+
+node uap-lab/test_detection_model_cards.js
