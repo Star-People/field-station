@@ -14,10 +14,11 @@ def main():
     current.update(enabled=args.enable,max_items=1000,max_bytes=25*1024**3,grace_seconds=900)
     temp=policy.with_suffix('.tmp');temp.write_text(json.dumps(current));temp.replace(policy)
     label='app.starpeople.field.negative-backlog';domain='gui/'+str(os.getuid())
-    logs=data/'negative-backlog-logs';logs.mkdir(exist_ok=True)
+    # launchd cannot reliably open removable-volume logs before Python starts.
+    logs=Path.home()/'Library/Logs/field-station';logs.mkdir(parents=True,exist_ok=True)
     agents=Path.home()/'Library/LaunchAgents';agents.mkdir(parents=True,exist_ok=True)
     plist=agents/(label+'.plist')
-    spec=dict(Label=label,ProgramArguments=[str(python),str(worker),'--data',str(data),'--apply','--watch'],WorkingDirectory=str(app),EnvironmentVariables={'XDG_RUNTIME_DIR':environment.get('XDG_RUNTIME_DIR',str(data.parent/'station-runtime')),'PATH':'/opt/homebrew/bin:/usr/bin:/bin','PYTHONUNBUFFERED':'1'},RunAtLoad=True,KeepAlive=True,ThrottleInterval=30,ProcessType='Background',StandardOutPath=str(logs/'worker.log'),StandardErrorPath=str(logs/'error.log'))
+    spec=dict(Label=label,ProgramArguments=[str(python),str(worker),'--data',str(data),'--apply','--watch'],WorkingDirectory=str(app),EnvironmentVariables={'XDG_RUNTIME_DIR':environment.get('XDG_RUNTIME_DIR',str(data.parent/'station-runtime')),'PATH':'/opt/homebrew/bin:/usr/bin:/bin','PYTHONUNBUFFERED':'1'},RunAtLoad=True,KeepAlive=True,ThrottleInterval=30,ProcessType='Background',StandardOutPath='/dev/null',StandardErrorPath=str(logs/'negative-backlog.error.log'))
     subprocess.run(['launchctl','bootout',domain+'/'+label],capture_output=True)
     plist.write_bytes(plistlib.dumps(spec))
     subprocess.run(['launchctl','bootstrap',domain,str(plist)],check=True)

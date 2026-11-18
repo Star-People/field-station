@@ -1,5 +1,5 @@
 """Bound the machine-negative review sample without touching reviewed evidence."""
-import argparse,collections,fcntl,hashlib,json,math,os,re,sqlite3,time
+import argparse,collections,fcntl,hashlib,json,math,os,re,sqlite3,sys,time
 from pathlib import Path
 from backlog_safety import read,protected,bookmark_lease
 from backlog_media import MEDIA
@@ -193,7 +193,12 @@ def main():
             # Never recreate a disappeared external volume on the startup disk.
             if not data.is_dir() or not data.parent.is_mount():raise ValueError('Field volume unavailable')
             print(json.dumps(cycle(data,args.apply)),flush=True)
-        except Exception as exc:print(json.dumps(dict(error=str(exc),epoch=time.time())),flush=True)
+        except Exception as exc:
+            failure=dict(error=str(exc),epoch=time.time())
+            print(json.dumps(failure),file=sys.stderr,flush=True)
+            try:
+                if data.is_dir() and data.parent.is_mount():save(data/'negative-backlog-status.json',failure)
+            except OSError:pass
         if not args.watch:break
         time.sleep(60)
 

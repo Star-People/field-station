@@ -29,6 +29,7 @@ python3 scripts/install_negative_backlog.py --app /Users/ufo-field/ufo-field --d
 The LaunchAgent starts after account login, restarts on failure, and refuses to
 run without the external field volume. The persistent policy, status, feature
 cache, pending deletion records, and audit history live on the external volume
-under `uap-lab/negative-backlog-*`. Run `negative_backlog.py --data PATH` without
+under `uap-lab/negative-backlog-*`. Only startup error logging uses the standard
+macOS user log directory; routine service output is discarded. Run `negative_backlog.py --data PATH` without
 `--apply` for a non-deleting preview. Set `enabled` to false in the policy to stop
 automatic deletion. Existing daytime expiration remains a separate opt-in policy.
