@@ -1,5 +1,5 @@
 """Install the bounded-negative sampler as a per-user macOS service."""
-import argparse,json,os,plistlib,subprocess
+import argparse,json,os,plistlib,subprocess,time
 from pathlib import Path
 
 def main():
@@ -20,6 +20,10 @@ def main():
     plist=agents/(label+'.plist')
     spec=dict(Label=label,ProgramArguments=[str(python),str(worker),'--data',str(data),'--apply','--watch'],WorkingDirectory=str(app),EnvironmentVariables={'XDG_RUNTIME_DIR':environment.get('XDG_RUNTIME_DIR',str(data.parent/'station-runtime')),'PATH':'/opt/homebrew/bin:/usr/bin:/bin','PYTHONUNBUFFERED':'1'},RunAtLoad=True,KeepAlive=True,ThrottleInterval=30,ProcessType='Background',StandardOutPath='/dev/null',StandardErrorPath=str(logs/'negative-backlog.error.log'))
     subprocess.run(['launchctl','bootout',domain+'/'+label],capture_output=True)
+    for attempt in range(60):
+        if subprocess.run(['launchctl','print',domain+'/'+label],capture_output=True).returncode:break
+        time.sleep(.5)
+    else:raise RuntimeError('Previous sampler is still stopping; retry installation')
     plist.write_bytes(plistlib.dumps(spec))
     subprocess.run(['launchctl','bootstrap',domain,str(plist)],check=True)
     print(json.dumps(dict(service=label,policy=current,status=str(data/'negative-backlog-status.json'))))
