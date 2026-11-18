@@ -25,6 +25,7 @@ PYTHONPATH="$PWD/capture-station:$PYTHONPATH" "$PYTHON" -m unittest discover -s 
 "$PYTHON" -m unittest discover -s uap-lab -p 'test_label_queue.py'
 "$PYTHON" -m unittest discover -s uap-lab -p 'test_backlog_control.py'
 "$PYTHON" -m unittest discover -s uap-lab -p 'test_backlog_safety.py'
+"$PYTHON" -m unittest discover -s uap-lab -p 'test_negative_backlog.py'
 
 "$PYTHON" -m unittest discover -s uap-lab -p 'test_direct_label_save.py'
 node scripts/test-queue-refresh.cjs
