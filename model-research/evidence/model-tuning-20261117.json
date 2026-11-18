@@ -354,7 +354,56 @@
       }
     }
   },
-  "full_set_replay": {
+  "native_parity": {
+    "checked": 512,
+    "maxdrift": 2.980232238769531e-07,
+    "version": "45977736e0a25777a4ab63dc418b2a4e4c56238f87a85c70df54698fca475ce5"
+  },
+  "hybrid_experiment": {
+    "source": "/Volumes/UFO-Work/field/hybrid-training/runs/f695d12dc0cb899cea97511c2562d3ab32f93ce5d21c13ce6fa18486cd8ab93e",
+    "threshold": 0.985,
+    "training_count": 88350,
+    "pseudo_count": 505,
+    "baseline_calibration": {
+      "tn": 17765,
+      "fp": 919,
+      "tp": 88,
+      "fn": 19,
+      "recall": 0.822429906542056,
+      "fpr": 0.049186469706700923,
+      "precision": 0.08738828202581926
+    },
+    "calibration": {
+      "tn": 18498,
+      "tp": 93,
+      "fp": 186,
+      "fn": 14,
+      "recall": 0.8691588785046729,
+      "fpr": 0.00995504174694926,
+      "precision": 0.3333333333333333
+    },
+    "baseline_validation": {
+      "tn": 7693,
+      "tp": 157,
+      "fp": 784,
+      "fn": 19,
+      "recall": 0.8920454545454546,
+      "fpr": 0.09248554913294797,
+      "precision": 0.16684378320935175
+    },
+    "validation": {
+      "tn": 8072,
+      "tp": 143,
+      "fp": 405,
+      "fn": 33,
+      "recall": 0.8125,
+      "fpr": 0.047776335967913176,
+      "precision": 0.26094890510948904
+    },
+    "accepted": false
+  },
+  "scope": "Historical recording-disjoint recipe comparison plus in-sample full-set replay. Not untouched prospective performance.",
+  "initial_release_replay": {
     "baseline": {
       "per_class": {
         "anomalous": {
@@ -421,53 +470,66 @@
     "count": 112689,
     "version": "45977736e0a25777a4ab63dc418b2a4e4c56238f87a85c70df54698fca475ce5"
   },
-  "native_parity": {
-    "checked": 512,
-    "maxdrift": 2.980232238769531e-07,
-    "version": "45977736e0a25777a4ab63dc418b2a4e4c56238f87a85c70df54698fca475ce5"
+  "final_thresholds": {
+    "human": 0.43,
+    "experimental": 0.6
   },
-  "hybrid_experiment": {
-    "source": "/Volumes/UFO-Work/field/hybrid-training/runs/f695d12dc0cb899cea97511c2562d3ab32f93ce5d21c13ce6fa18486cd8ab93e",
-    "threshold": 0.985,
-    "training_count": 88350,
-    "pseudo_count": 505,
-    "baseline_calibration": {
-      "tn": 17765,
-      "fp": 919,
-      "tp": 88,
-      "fn": 19,
-      "recall": 0.822429906542056,
-      "fpr": 0.049186469706700923,
-      "precision": 0.08738828202581926
+  "final_paired_replay": {
+    "human": {
+      "tp": 1297,
+      "fp": 942,
+      "tn": 110440,
+      "fn": 10,
+      "threshold": 0.43,
+      "count": 112689
     },
-    "calibration": {
-      "tn": 18498,
-      "tp": 93,
-      "fp": 186,
-      "fn": 14,
-      "recall": 0.8691588785046729,
-      "fpr": 0.00995504174694926,
-      "precision": 0.3333333333333333
-    },
-    "baseline_validation": {
-      "tn": 7693,
-      "tp": 157,
-      "fp": 784,
-      "fn": 19,
-      "recall": 0.8920454545454546,
-      "fpr": 0.09248554913294797,
-      "precision": 0.16684378320935175
-    },
-    "validation": {
-      "tn": 8072,
-      "tp": 143,
-      "fp": 405,
-      "fn": 33,
-      "recall": 0.8125,
-      "fpr": 0.047776335967913176,
-      "precision": 0.26094890510948904
-    },
-    "accepted": false
+    "experimental": {
+      "tp": 1282,
+      "fp": 567,
+      "tn": 110815,
+      "fn": 25,
+      "threshold": 0.6,
+      "count": 112689
+    }
   },
-  "scope": "Historical recording-disjoint recipe comparison plus in-sample full-set replay. Not untouched prospective performance."
+  "fixed_operating_points": {
+    "731": {
+      "baseline_human": [
+        999,
+        1734
+      ],
+      "revised_human": [
+        999,
+        1675
+      ],
+      "baseline_experimental": [
+        959,
+        1331
+      ],
+      "revised_experimental": [
+        971,
+        1300
+      ]
+    },
+    "947": {
+      "baseline_human": [
+        989,
+        1595
+      ],
+      "revised_human": [
+        996,
+        1593
+      ],
+      "baseline_experimental": [
+        963,
+        1160
+      ],
+      "revised_experimental": [
+        964,
+        1157
+      ]
+    },
+    "counts": "[true positives, false positives]",
+    "scope": "Historical out-of-fold development; used to select operating points, not untouched confirmation"
+  }
 }
