@@ -109,6 +109,13 @@ class CleanupTests(unittest.TestCase):
         save(self.data/'email-reviews/training-manifest.json',dict(examples=[dict(event_id=key,human_confirmed=True)]))
         self.run_cycle();self.assertTrue((folder/'native-object.png').exists())
 
+    def test_published_tracking_groups_count_toward_cap_but_unfinished_work_is_protected(self):
+        published,pf=self.event();self.event();unfinished,uf=self.event()
+        save(self.data.parent/'notifications/outbox/producer-state.json',dict(groups=[dict(id=published,notified=True),dict(id=unfinished,notified=False)]))
+        result=self.run_cycle()
+        self.assertEqual(result['eligible'],2);self.assertEqual(result['deleted'],1)
+        self.assertFalse((pf/'native-object.png').exists());self.assertTrue((uf/'native-object.png').exists())
+
     def test_incomplete_index_does_not_scan_all_history_before_current_queue(self):
         from detection_library import cache_path
         visible='f'*32;arrival='e'*32;previous='d'*32

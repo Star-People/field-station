@@ -117,7 +117,9 @@ def discover(data,reviewed,retired,cache):
     keys=discovery_keys(data,cache,cutoff)
     pending={p.stem for p in (data/'negative-backlog-pending').glob('*.json')}
     keys=sorted(set(keys)|pending)
-    active={r.get('id') for r in read(root/'producer-state.json',{}).get('groups',[])}
+    # Published groups remain tracked for deduplication, but submit() never
+    # writes their media again. Only unpublished groups are in-flight writes.
+    active={r.get('id') for r in read(root/'producer-state.json',{}).get('groups',[]) if not r.get('notified')}
     cache.execute('CREATE TABLE IF NOT EXISTS inventory(id TEXT PRIMARY KEY, stamp INTEGER, row TEXT)')
     result=[];errors=[]
     for key in keys:
@@ -207,7 +209,7 @@ def run(data,settings,now,apply):
                         event=read(folder/'event.json',{})
                         if not candidate(event) or now-event.get('created_epoch',now)<settings['grace_seconds']:continue
                         if read(data/'review-leases.json',{}).get(key,0)>time.time():result['deferred']+=1;continue
-                        if key in {g.get('id') for g in read(root/'producer-state.json',{}).get('groups',[])}:continue
+                        if key in {g.get('id') for g in read(root/'producer-state.json',{}).get('groups',[]) if not g.get('notified')}:continue
                         paths=files(data,key)
                         # Publish exclusion before removing media; cached lists honor tombstones.
                         current=read(data/'retired-objects.json',{});events=set(current.get('events',[]));events.add(key)
