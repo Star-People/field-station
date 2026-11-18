@@ -59,7 +59,7 @@ def features(folder,event):
     if path.is_symlink():raise ValueError('Unsafe crop')
     with Image.open(path) as image:
         rgb=image.convert('RGB').resize((16,16));means=ImageStat.Stat(rgb).mean
-        gray=list(rgb.convert('L').resize((5,4)).getdata())
+        small=rgb.convert('L').resize((5,4));gray=[small.getpixel((x,y)) for y in range(4) for x in range(5)]
     bits=''.join('1' if gray[y*5+x]>gray[y*5+x+1] else '0' for y in range(4) for x in range(4))
     # Broad color/brightness and edge signature distinguish recurring scenes.
     return '-'.join(str(int(v)//64) for v in means)+':'+hex(int(bits,2))[2:]
@@ -125,7 +125,12 @@ def cycle(data,apply=False,now=None):
     with (data/'negative-backlog.lock').open('a') as worker:
         try:fcntl.flock(worker,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError:return dict(busy=True)
-        return run(data,settings,now,apply)
+        started=time.monotonic()
+        if apply:save(data/'negative-backlog-status.json',dict(read(data/'negative-backlog-status.json',{}),phase='scanning',scan_started_epoch=time.time()))
+        result=run(data,settings,now,apply)
+        result.update(phase='idle',finished_epoch=time.time(),seconds=time.monotonic()-started)
+        if apply:save(data/'negative-backlog-status.json',result)
+        return result
 
 def run(data,settings,now,apply):
     root=data.parent/'notifications/outbox';version=review_version(data);reviewed=human_events(data)
