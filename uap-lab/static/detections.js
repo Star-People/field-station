@@ -89,8 +89,9 @@
    const data=await api('/api/objects?'+window.REVIEW_FILTERS.query(''));if(rev!==version)return;
    refreshFailed=false;renderTabs(data.counts,(data.counts_indexing??data.indexing)||data.ready===false,data.filter_counts,data.source_counts);
    // An incomplete index is not evidence that existing cards disappeared.
-   if(data.ready===false||data.indexing||selected.size||pending.size||deleting.size||starring.size||$('queueFrame').open||document.querySelector('.detection-card:hover,.controls-open')||[...$('detectionQueue').querySelectorAll('video')].some(v=>!v.paused))return;
+   if(data.ready===false||selected.size||deleting.size||starring.size||$('queueFrame').open||document.querySelector('.detection-card:hover,.controls-open')||[...$('detectionQueue').querySelectorAll('video')].some(v=>!v.paused))return;
    const items=data.items.filter(row=>!deletedIds.has(row.id)&&!saving(row.id)&&!dismissed.has(row.id)),wanted=new Set(items.map(row=>row.id)),grid=$('detectionQueue'),nodes=new Map([...grid.children].map(node=>[node.dataset.id,node]));
+   if(pending.size||data.indexing){for(const row of [...items].reverse())if(!rows.has(row.id)){rows.set(row.id,row);grid.prepend(card(row));}$('queueEmpty').hidden=rows.size>0;selection();return;}
    for(const [id,node]of nodes)if(!wanted.has(id)){node.remove();rows.delete(id);}
    for(const [index,row]of items.entries()){
     let node=nodes.get(row.id);
@@ -122,7 +123,7 @@
     forget(prefix+item.body.request_id);if(item.legacyKey)forget(item.legacyKey);pending.delete(id);dismissed.add(id);saved++;
     const row=rows.get(id);if(row){row.label=result.label;row.human_reviewed=true;const old=[...$('detectionQueue').children].find(n=>n.dataset.id===id);if(matches(row)){old?.replaceWith(card(row));}else{old?.remove();rows.delete(id);}}selected.delete(id);
    }
-   progress();selection();
+   progress();selection();if(rows.size<100&&!selected.size)void refresh();
   }}finally{draining=false;selection();if(pending.size)progress();else if(saved)notice(saved+' object'+(saved===1?'':'s')+' reviewed');if(saved&&!pending.size&&!selected.size)await refresh();else if(!rows.size&&more)await load();}
  }
  for(const label of ['anomalous','not_anomalous']){const b=el('button',pretty(label));b.onclick=()=>{for(const id of [...selected])enqueue(rows.get(id),label,true);selection();drain();};$('bulkCategories').append(b);}
@@ -135,7 +136,7 @@
  window.addEventListener('online',drain);window.addEventListener('station-reconnected',e=>{token=e.detail.token;drain();});
  setInterval(()=>{if(pending.size)drain();},5000);
  // Refresh only when idle; never replace a selection or open inspection.
- setInterval(()=>{if(!document.hidden&&!loading&&rows.size<=100&&!selected.size&&!pending.size&&!deleting.size&&!starring.size&&!$('queueFrame').open&&window.scrollY<150&&!document.querySelector('.detection-card:hover,.controls-open'))refresh();},15000);
+ setInterval(()=>{if(!document.hidden&&!loading&&rows.size<=100&&!selected.size&&!deleting.size&&!starring.size&&!$('queueFrame').open&&window.scrollY<150&&!document.querySelector('.detection-card:hover,.controls-open'))refresh();},15000);
  new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)&&rows.size)load();},{rootMargin:'200px'}).observe($('moreDetections'));
  api('/api/labeled-frames/token').then(async d=>{const cutoff=d.pending_reset?.epoch||0;let discarded=0;for(const [id,item] of pending){if(cutoff&&(!item.body.queued_at||item.body.queued_at<=cutoff)){forget(prefix+item.body.request_id);if(item.legacyKey)forget(item.legacyKey);pending.delete(id);discarded++;}}token=d.token;await reset();progress();if(discarded)notice(discarded+' pending labels discarded as requested');await drain();}).catch(e=>{notice(e.message);});
 })();
