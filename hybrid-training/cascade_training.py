@@ -21,7 +21,8 @@ def freeze_inputs(cfg,request_id):
 
 def build_snapshot(cfg,cycle,lane):
  settings=cfg['lanes'][lane];root=Path(settings['root']);source=Path(cycle['stable_source']);base=read(source/'dataset.json');recipe=read(root/'recipe.json',{})
- key=hashlib.sha256(json.dumps([cycle['id'],lane,base['fingerprint'],recipe,'human-grounded-v2'],sort_keys=True).encode()).hexdigest();folder=root/'runs'/key
+ reset=read(root/'corpus-reset.json',{}).get('epoch',0) if lane=='machine' else 0
+ key=hashlib.sha256(json.dumps([cycle['id'],lane,base['fingerprint'],recipe,'human-grounded-v2',reset],sort_keys=True).encode()).hexdigest();folder=root/'runs'/key
  if (folder/'dataset.json').exists():return folder
  if folder.exists():folder.rename(folder.with_name(key+'.incomplete.'+str(time.time_ns())))
  (folder/'images').mkdir(parents=True)
@@ -31,9 +32,7 @@ def build_snapshot(cfg,cycle,lane):
   rows.append(dict(row,label_source='human' if row.get('human_confirmed') else row.get('label_source','base')));sources.append(source/row['image'])
  if lane in ('hybrid','machine'):
   corpus=Path(settings['root'])/'corpus';machine_rows=list(read(cycle['inputs'][lane],{}).values())
-  if lane=='machine':
-   reset=read(root/'corpus-reset.json',{}).get('epoch',0)
-   if reset:machine_rows=[r for r in machine_rows if r.get('admitted_epoch',r.get('preserved_epoch',0))>reset]
+  if reset:machine_rows=[r for r in machine_rows if r.get('admitted_epoch',r.get('preserved_epoch',0))>reset]
   machine_rows=eligible_pseudo(rows,machine_rows)
   held_out={alias for row in rows if row['split']!='train' for alias in row.get('group_aliases',[])}
   for row in machine_rows:
