@@ -38,3 +38,24 @@ class RecoveredArchiveTests(TestCase):
     def test_recovery_directory_symlinks_are_rejected(self):
         self.approve();(self.folder/'recovery-crops').symlink_to(self.root,target_is_directory=True)
         with self.assertRaisesRegex(ValueError,'Unsafe recovery evidence directory'):self.a.complete_session_plan(self.job,self.m)
+
+    def test_recovery_derives_after_final_file_only(self):
+        from unittest.mock import patch
+        api=ArchiveAPI(self.a.private);job={'id':SID,'identifier':'recovery-test','recovered_evidence':{'operator_approved':True},'files':[{'name':'video.mp4'},{'name':'archive-index.json'}]}
+        with patch.object(api,'raw') as raw:
+            raw.return_value.__enter__.return_value.content=b'<Result><UploadId>upload-one</UploadId></Result>'
+            api.initiate(job,{'name':'video.mp4'})
+            self.assertEqual(raw.call_args.args[3]['x-archive-queue-derive'],'0')
+            raw.return_value.__enter__.return_value.content=b''
+            api.complete(job,{'name':'video.mp4'},'upload-one',[])
+            self.assertEqual(raw.call_args.args[3]['x-archive-queue-derive'],'0')
+            p=self.folder/'archive-index.json';p.write_bytes(b'');entry=dict(name=p.name,**hashes(p));api.small(job,entry,p)
+            self.assertEqual(raw.call_args.args[3]['x-archive-queue-derive'],'1')
+
+    def test_regular_multipart_processing_is_unchanged(self):
+        from unittest.mock import patch
+        api=ArchiveAPI(self.a.private)
+        with patch.object(api,'raw') as raw:
+            raw.return_value.__enter__.return_value.content=b'<Result><UploadId>upload-one</UploadId></Result>'
+            api.initiate({'id':SID,'identifier':'normal-test'},{'name':'video.mp4'})
+            self.assertEqual(raw.call_args.args[3]['x-archive-queue-derive'],'1')

@@ -97,7 +97,8 @@ class ArchiveAPI:
         if not result.get('success') or not result.get('value',{}).get('task_id'):raise ArchiveError(503,'Archive withdrawal/restoration task was not confirmed; retrying')
         return result['value']['task_id']
     def small(self,job,entry,path):
-        headers=self.item_headers(job)
+        final_recovery_file=bool(job.get('recovered_evidence') and job.get('files') and entry['name']==job['files'][-1]['name'])
+        headers=self.item_headers(job,derive=final_recovery_file)
         headers.update({'Content-Length':str(entry['bytes']),'Content-MD5':base64.b64encode(bytes.fromhex(entry['md5'])).decode(),'Content-Type':'image/jpeg' if entry['name'].endswith('.jpg') else 'application/json' if entry['name'].endswith('.json') else 'application/octet-stream'})
         if not entry['bytes']:
             with self.raw('PUT',self.url(job['identifier'],entry['name']),b'',headers,auth=True):pass
@@ -105,7 +106,7 @@ class ArchiveAPI:
             with path.open('rb') as body:
                 with self.raw('PUT',self.url(job['identifier'],entry['name']),body,headers,auth=True):pass
     def initiate(self,job,entry):
-        with self.raw('POST',self.url(job['identifier'],entry['name'])+'?uploads',b'',self.item_headers(job,derive=True),auth=True) as r:
+        with self.raw('POST',self.url(job['identifier'],entry['name'])+'?uploads',b'',self.item_headers(job,derive=not bool(job.get('recovered_evidence'))),auth=True) as r:
             root=ET.fromstring(r.content)
         upload_id=next((e.text for e in root.iter() if e.tag.split('}')[-1]=='UploadId'),None)
         if not upload_id:raise ArchiveError(502,'Internet Archive did not return a multipart upload ID')
@@ -120,7 +121,7 @@ class ArchiveAPI:
         root=ET.Element('CompleteMultipartUpload')
         for part in parts:
             item=ET.SubElement(root,'Part');ET.SubElement(item,'PartNumber').text=str(part['number']);ET.SubElement(item,'ETag').text=part['etag']
-        with self.raw('POST',self.url(job['identifier'],entry['name'])+'?'+urlencode(dict(uploadId=upload_id)),ET.tostring(root),{'Content-Type':'application/xml','x-archive-queue-derive':'1'},auth=True) as r:
+        with self.raw('POST',self.url(job['identifier'],entry['name'])+'?'+urlencode(dict(uploadId=upload_id)),ET.tostring(root),{'Content-Type':'application/xml','x-archive-queue-derive':'0' if job.get('recovered_evidence') else '1'},auth=True) as r:
             if r.content:
                 response=ET.fromstring(r.content)
                 if response.tag.split('}')[-1]=='Error':raise ArchiveError(503,'Internet Archive has not committed the upload; queued for verification')
