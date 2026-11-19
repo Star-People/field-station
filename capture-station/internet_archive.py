@@ -84,7 +84,7 @@ class ArchiveAPI:
         return {'x-archive-auto-make-bucket':'1','x-archive-meta-collection':'opensource_movies',
             'x-archive-meta-mediatype':'movies','x-archive-meta-title':'Field Station '+job['id'],
             'x-archive-meta-creator':'UFO Files Project','x-archive-meta-subject':subject,
-            'x-archive-meta-description':('Operator-requested manual camera and RF recording. Original-quality video and associated data are published immediately; explicitly reviewed frame annotations are added to this same item when available.' if job.get('manual_scope') else 'Human-reviewed camera and RF observation. Session '+job['id']+'. Includes raw video.mp4 and video-annotated.mp4 with human-reviewed boxes on explicitly labeled frames. An anomalous label means unidentified by the reviewer, not an established explanation.'),
+            'x-archive-meta-description':('Recovered human-reviewed anomalous observation. The complete original session is unavailable. This item preserves the surviving, unmodified review excerpt, its annotated video, reviewed full-resolution frames, saved training crops, RF observations, and any recovered context or source segments. See recovery-publication.json for exact coverage and provenance. This recovered evidence was approved for publication as the final available record; it is not a complete-session recording. An anomalous label means unidentified by the reviewer, not an established explanation.' if job.get('recovered_evidence') else 'Operator-requested manual camera and RF recording. Original-quality video and associated data are published immediately; explicitly reviewed frame annotations are added to this same item when available.' if job.get('manual_scope') else 'Human-reviewed camera and RF observation. Session '+job['id']+'. Includes raw video.mp4 and video-annotated.mp4 with human-reviewed boxes on explicitly labeled frames. An anomalous label means unidentified by the reviewer, not an established explanation.'),
             'x-archive-queue-derive':'1' if derive else '0','x-archive-keep-old-version':'1'}
     def update_tags(self,job):
         body=urlencode({'-target':'metadata','-patch':json.dumps([dict(op='add',path='/subject',value=subjects(job))])}).encode()
@@ -97,7 +97,8 @@ class ArchiveAPI:
         if not result.get('success') or not result.get('value',{}).get('task_id'):raise ArchiveError(503,'Archive withdrawal/restoration task was not confirmed; retrying')
         return result['value']['task_id']
     def small(self,job,entry,path):
-        headers=self.item_headers(job)
+        final_recovery_file=bool(job.get('recovered_evidence') and job.get('files') and entry['name']==job['files'][-1]['name'])
+        headers=self.item_headers(job,derive=final_recovery_file)
         headers.update({'Content-Length':str(entry['bytes']),'Content-MD5':base64.b64encode(bytes.fromhex(entry['md5'])).decode(),'Content-Type':'image/jpeg' if entry['name'].endswith('.jpg') else 'application/json' if entry['name'].endswith('.json') else 'application/octet-stream'})
         if not entry['bytes']:
             with self.raw('PUT',self.url(job['identifier'],entry['name']),b'',headers,auth=True):pass
@@ -105,7 +106,7 @@ class ArchiveAPI:
             with path.open('rb') as body:
                 with self.raw('PUT',self.url(job['identifier'],entry['name']),body,headers,auth=True):pass
     def initiate(self,job,entry):
-        with self.raw('POST',self.url(job['identifier'],entry['name'])+'?uploads',b'',self.item_headers(job,derive=True),auth=True) as r:
+        with self.raw('POST',self.url(job['identifier'],entry['name'])+'?uploads',b'',self.item_headers(job,derive=not bool(job.get('recovered_evidence'))),auth=True) as r:
             root=ET.fromstring(r.content)
         upload_id=next((e.text for e in root.iter() if e.tag.split('}')[-1]=='UploadId'),None)
         if not upload_id:raise ArchiveError(502,'Internet Archive did not return a multipart upload ID')
@@ -120,7 +121,7 @@ class ArchiveAPI:
         root=ET.Element('CompleteMultipartUpload')
         for part in parts:
             item=ET.SubElement(root,'Part');ET.SubElement(item,'PartNumber').text=str(part['number']);ET.SubElement(item,'ETag').text=part['etag']
-        with self.raw('POST',self.url(job['identifier'],entry['name'])+'?'+urlencode(dict(uploadId=upload_id)),ET.tostring(root),{'Content-Type':'application/xml','x-archive-queue-derive':'1'},auth=True) as r:
+        with self.raw('POST',self.url(job['identifier'],entry['name'])+'?'+urlencode(dict(uploadId=upload_id)),ET.tostring(root),{'Content-Type':'application/xml','x-archive-queue-derive':'0' if job.get('recovered_evidence') else '1'},auth=True) as r:
             if r.content:
                 response=ET.fromstring(r.content)
                 if response.tag.split('}')[-1]=='Error':raise ArchiveError(503,'Internet Archive has not committed the upload; queued for verification')
@@ -187,6 +188,9 @@ class InternetArchive:
         from manual_archive import enabled,plan
         if enabled(self,manifest):return plan(self,job,manifest)
         decision=load(self.folder(job['id'])/'archive-decision.json',{})
+        recovery=load(self.folder(job['id'])/'recovery-publication.json',{})
+        recovery_changed=job.get('recovered_evidence')!=recovery and recovery.get('operator_approved') is True
+        if recovery.get('operator_approved') is True and recovery.get('scope')=='surviving_evidence':job['recovered_evidence']=recovery
         tags=load(self.data.parent/'archive-tags'/(job['id']+'.json'),{})
         job['custom_tags']=normalize(tags.get('tags',[]))
         if 'ce5_playback' not in job:job['ce5_playback']=ce5_overlap(self.data.parent,manifest)
@@ -201,9 +205,9 @@ class InternetArchive:
                 with tags_path.with_suffix('.lock').open('a') as lock:
                     fcntl.flock(lock,fcntl.LOCK_EX)
                     if not tags_path.exists():save(tags_path,dict(tags=[],revision=secrets.token_hex(16),saved_epoch=time.time()))
-        priority=max(decision.get('reviewed_epoch',0),load(self.folder(job['id'])/'review-trim.json',{}).get('saved_epoch',0))
+        priority=max(decision.get('reviewed_epoch',0),load(self.folder(job['id'])/'review-trim.json',{}).get('saved_epoch',0),recovery.get('approved_epoch',0) if recovery.get('operator_approved') is True else 0)
         priority_changed=job.get('manual_priority_epoch')!=priority;job['manual_priority_epoch']=priority
-        if job.get('plan_version')==5 and job.get('review_revision')==decision.get('review_revision'):return priority_changed
+        if job.get('plan_version')==5 and job.get('review_revision')==decision.get('review_revision') and not recovery_changed:return priority_changed
         folder=self.folder(job['id']);old_files=list(job['files']);old_length=len(old_files);known={e['name'] for e in job['files']}
         changed=[]
         # Preview samples are not reviewed evidence. Only publish indexed pairs.
@@ -224,6 +228,12 @@ class InternetArchive:
         # private/configuration folders or follow symlinks.
         known={e['name'] for e in job['files']}
         evidence=[folder/'video-annotated.mp4']
+        if job.get('recovered_evidence'):
+            evidence.append(folder/'recovery-original.mp4')
+            for directory in ('recovery-segments','recovery-context','recovery-crops'):
+                parent=folder/directory
+                if parent.is_symlink():raise ValueError('Unsafe recovery evidence directory')
+                evidence.extend(p for p in parent.glob('*') if p.suffix.lower() in ('.mkv','.mp4','.png','.json','.jsonl'))
         if (folder/'video.mkv').is_file():evidence.append(folder/'video.mkv')
         for directory,patterns in (
             ('buffer-segments',('frame-times-*.jsonl',)),
