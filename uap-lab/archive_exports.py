@@ -94,6 +94,14 @@ def command(args):
 
 def ensure_source(folder,groups):
  import lab
+ from approved_recovery import source as recovered_source
+ recovered=recovered_source(folder)
+ if recovered is not None:
+  playback=folder/'video.mp4'
+  if not playback.is_file():
+   from evidence_copy import copy_evidence
+   copy_evidence(recovered,playback)
+  return recovered,playback
  raw=folder/'video.mkv';playback=folder/'video.mp4'
  if not raw.exists():
   from archive_restore import restore_original
