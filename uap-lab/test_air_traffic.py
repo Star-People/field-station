@@ -20,6 +20,13 @@ class TrafficTests(unittest.TestCase):
   for value in [0,401,True,float('nan')]:
    with self.assertRaises(ValueError):a.save_settings(self.root,{'address':a.DEFAULT['address'],'camera_focal_length_mm':value})
    self.assertEqual(a.settings(self.root),before)
+ def test_locked_history_does_not_block_live_snapshot(self):
+  import sqlite3
+  with patch.object(a,'fetch_json',return_value=self.payload()),patch.object(a,'database',side_effect=sqlite3.OperationalError('database is locked')):
+   result=a.collect_once(self.root)
+  self.assertEqual(a.live(self.root)['status'],'available')
+  self.assertEqual(a.live(self.root)['sampled_epoch'],result['sampled_epoch'])
+  self.assertEqual(a.read(a.base(self.root)/'history-status.json')['status'],'retrying')
  def payload(self,**kw):
   row=dict(hex='abc123',flight='UAL123 ',lat=37.4,lon=-122.18,alt_baro=10000,gs=200,track=0,seen_pos=1);row.update(kw)
   return dict(now=self.now*1000,ac=[row])

@@ -145,6 +145,8 @@ def database(root, writable=False, namespace=""):
     return db
 
 def store(root, snapshot, namespace=""):
+    # Live rendering must not wait for the historical database.
+    atomic(base(root)/(namespace+'latest.json'),snapshot)
     data=zlib.compress(json.dumps(snapshot,separators=(',',':')).encode())
     with contextlib.closing(database(root,True,namespace)) as db,db:
         db.execute('INSERT OR REPLACE INTO snapshots VALUES(?,?,?)',(snapshot['sampled_epoch'],snapshot['center_id'],data))
@@ -155,7 +157,6 @@ def store(root, snapshot, namespace=""):
             for epoch,length in db.execute('SELECT epoch,length(body) FROM snapshots ORDER BY epoch').fetchall():
                 db.execute('DELETE FROM snapshots WHERE epoch=?',(epoch,));size-=length
                 if size<=60*1024**2:break
-    atomic(base(root)/(namespace+'latest.json'),snapshot)
 
 def live(root, now=None):
     now=time.time() if now is None else now
@@ -201,7 +202,12 @@ def detection(root, folder, event):
 def collect_once(root):
     config=settings(root)
     url=f"https://opendata.adsb.fi/api/v3/lat/{config['latitude']}/lon/{config['longitude']}/dist/{math.ceil(config['radius_nm'])}"
-    snapshot=normalize(fetch_json(url),config,time.time());store(root,snapshot)
+    snapshot=normalize(fetch_json(url),config,time.time())
+    try:
+        store(root,snapshot)
+        atomic(base(root)/'history-status.json',dict(status='stored',epoch=time.time()))
+    except sqlite3.Error as error:
+        atomic(base(root)/'history-status.json',dict(status='retrying',epoch=time.time(),error=str(error)))
     return snapshot
 
 def region_key(config):

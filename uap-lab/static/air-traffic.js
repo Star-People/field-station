@@ -52,9 +52,9 @@
  const viewer=document.querySelector('#liveViewer');
  if(viewer){
   const panel=document.createElement('section');panel.className='air-radar';panel.setAttribute('aria-label','Nearby aircraft');
-  panel.innerHTML='<div class="air-radar-heading"><span>Air traffic</span><span class="air-radar-state" role="status">Connecting…</span></div><div class="air-radar-stage"><canvas width="520" height="520" role="img" aria-label="North-up aircraft radar with direction-of-travel arrows"></canvas><div class="air-radar-tip" hidden></div></div><div class="air-radar-footer"><span class="air-radar-center"></span><a href="https://adsb.fi/" target="_blank" rel="noopener noreferrer">adsb.fi ↗</a></div>';
+  panel.innerHTML='<div class="air-radar-heading" style="align-items:flex-start"><div><span>Air traffic</span><div class="air-radar-camera" style="font-size:10px;margin-top:3px" hidden></div></div><div style="text-align:right"><span class="air-radar-state" role="status">Connecting…</span><div class="air-radar-fov-count" style="font-size:10px;margin-top:3px" title="Estimated aircraft inside the shaded bearing wedge; vertical visibility is not confirmed." hidden></div></div></div><div class="air-radar-stage"><canvas width="520" height="520" role="img" aria-label="North-up aircraft radar with direction-of-travel arrows"></canvas><div class="air-radar-tip" hidden></div></div><div class="air-radar-footer"><span class="air-radar-center"></span><a href="https://adsb.fi/" target="_blank" rel="noopener noreferrer">adsb.fi ↗</a></div>';
   viewer.append(panel);
-  const canvas=panel.querySelector('canvas'),ctx=canvas.getContext('2d'),state=panel.querySelector('.air-radar-state'),center=panel.querySelector('.air-radar-center'),tip=panel.querySelector('.air-radar-tip');let latest=null,points=[],busy=false,timer,requestFailed=false;
+  const canvas=panel.querySelector('canvas'),ctx=canvas.getContext('2d'),state=panel.querySelector('.air-radar-state'),center=panel.querySelector('.air-radar-center'),tip=panel.querySelector('.air-radar-tip'),fovCount=panel.querySelector('.air-radar-fov-count'),cameraInfo=panel.querySelector('.air-radar-camera');let latest=null,points=[],busy=false,timer,requestFailed=false;
   const rf=document.querySelector('#rfOverlay');
   function ink(){panel.style.color=rf?.style.color||'#fff';draw();}
   if(rf)new MutationObserver(ink).observe(rf,{attributes:true,attributeFilter:['style']});
@@ -66,6 +66,7 @@
    const bearing=Math.atan2(Math.sin(dl)*Math.cos(p2),Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl));return {distance,bearing};
   }
   function draw(){
+   fovCount.hidden=true;cameraInfo.hidden=true;
    const fov=previewOptics||latest?.camera_fov;
    const heading=Number.isFinite(latest?.camera_azimuth_deg)?radians(latest.camera_azimuth_deg):0;
    const color=getComputedStyle(panel).color,cx=260,cy=260,r=218;ctx.clearRect(0,0,520,520);ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=1.5;ctx.font=(canvas.clientWidth<180?'28':'19')+'px "IBM Plex Mono", monospace';ctx.textAlign='center';points=[];
@@ -78,7 +79,7 @@
    for(const [label,degrees] of [['N',0],['E',90],['S',180],['W',270]]){const angle=radians(degrees)-heading;ctx.fillText(label,cx+Math.sin(angle)*242,cy-Math.cos(angle)*242+6);}
    ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
    const range=latest?.radius_nm||(15/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi radius',464,468);
-   if(Number.isFinite(latest?.camera_azimuth_deg)){const angle=0,x=cx+Math.sin(angle)*r,y=cy-Math.cos(angle)*r;ctx.save();ctx.setLineDash([8,7]);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(x,y);ctx.stroke();ctx.restore();ctx.textAlign='left';ctx.font='20px \"IBM Plex Mono\", monospace';ctx.fillText('Camera '+latest.camera_azimuth_deg+'°'+(fov?' · '+fov.focal_length_mm+' mm':''),0,24);}
+   if(Number.isFinite(latest?.camera_azimuth_deg)){const angle=0,x=cx+Math.sin(angle)*r,y=cy-Math.cos(angle)*r;ctx.save();ctx.setLineDash([8,7]);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(x,y);ctx.stroke();ctx.restore();ctx.textAlign='left';ctx.font='20px \"IBM Plex Mono\", monospace';cameraInfo.textContent='Camera '+latest.camera_azimuth_deg+'°'+(fov?' · '+fov.focal_length_mm+' mm':'');cameraInfo.hidden=false;}
    if(latest?.center){
     const fontSize=canvas.clientWidth<180?25:18,marks=[],placed=[];
     ctx.font=fontSize+'px "IBM Plex Mono", monospace';
@@ -111,6 +112,7 @@
    }
    if(latest?.status!=='available')return;
    const now=Date.now()/1000;const fresh=(latest.aircraft||[]).filter(a=>now-a.position_epoch>=0&&now-a.position_epoch<=30);state.textContent=requestFailed?'Reconnecting…':now-latest.sampled_epoch>30?'Feed delayed':fresh.length+' aircraft';
+   if(!requestFailed&&now-latest.sampled_epoch<=30&&Number.isFinite(latest.camera_azimuth_deg)&&Number.isFinite(fov?.azimuth_span_deg)){const count=fresh.filter(a=>{const p=position(a,latest.center),delta=Math.atan2(Math.sin(p.bearing-heading),Math.cos(p.bearing-heading));return p.distance<=range&&Math.abs(delta)<=radians(fov.azimuth_span_deg/2);}).length;fovCount.textContent=count+' in Field of View';fovCount.hidden=false;}
    for(const a of latest.aircraft||[]){
     if(now-a.position_epoch>30||now<a.position_epoch)continue;
     const p=position(a,latest.center);if(p.distance>range)continue;
