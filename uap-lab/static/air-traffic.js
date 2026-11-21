@@ -55,13 +55,34 @@
    const range=latest?.radius_nm||(15/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi radius',464,468);
    if(Number.isFinite(latest?.camera_azimuth_deg)){const angle=0,x=cx+Math.sin(angle)*r,y=cy-Math.cos(angle)*r;ctx.save();ctx.setLineDash([8,7]);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(x,y);ctx.stroke();ctx.restore();ctx.textAlign='left';ctx.font='20px \"IBM Plex Mono\", monospace';ctx.fillText('Camera '+latest.camera_azimuth_deg+'°',26,48);}
    if(latest?.center){
-    ctx.font=(canvas.clientWidth<180?'25':'18')+'px "IBM Plex Mono", monospace';
+    const fontSize=canvas.clientWidth<180?25:18,marks=[],placed=[];
+    ctx.font=fontSize+'px "IBM Plex Mono", monospace';
     for(const landmark of latest.landmarks||[]){const p=position(landmark,latest.center);if(p.distance>range)continue;
-     const x=cx+Math.sin(p.bearing-heading)*p.distance/range*r,y=cy-Math.cos(p.bearing-heading)*p.distance/range*r;
-     ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.strokeRect(-5,-5,10,10);ctx.restore();points.push({x,y,landmark});
-     const label=landmark.label.length>18?landmark.label.slice(0,17)+'…':landmark.label;
-     ctx.save();ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(label,x,y+12);ctx.restore();
+     marks.push({landmark,x:cx+Math.sin(p.bearing-heading)*p.distance/range*r,y:cy-Math.cos(p.bearing-heading)*p.distance/range*r});
     }
+    const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
+    for(const mark of marks){const {x,y,landmark}=mark,label=landmark.label.length>18?landmark.label.slice(0,17)+'…':landmark.label,w=ctx.measureText(label).width,h=fontSize*1.2;
+     // Prefer centered below. Move only labels that collide, leaving all geographic markers fixed.
+     let box=null;
+     for(let gap=12;gap<=180&&!box;gap+=h+10){
+      for(const [left,top] of [[x-w/2,y+gap],[x-w/2,y-gap-h],[x+gap,y-h/2],[x-gap-w,y-h/2]]){
+       const candidate={left,right:left+w,top,bottom:top+h};
+       if(left<10||candidate.right>510||top<60||candidate.bottom>450)continue;
+       const padded={left:left-4,right:candidate.right+4,top:top-4,bottom:candidate.bottom+4};
+       if(placed.some(v=>overlaps(padded,v))||marks.some(v=>overlaps(padded,{left:v.x-8,right:v.x+8,top:v.y-8,bottom:v.y+8})))continue;
+       box=candidate;break;
+      }
+     }
+     if(box){placed.push(box);ctx.save();
+      if(box.left!==x-w/2||box.top!==y+12){
+       const endX=Math.max(box.left,Math.min(box.right,x)),endY=Math.max(box.top,Math.min(box.bottom,y)),dx=endX-x,dy=endY-y,length=Math.hypot(dx,dy);
+       ctx.globalAlpha=.6;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+dx/length*8,y+dy/length*8);ctx.lineTo(endX,endY);ctx.stroke();ctx.globalAlpha=1;
+      }
+      ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(label,(box.left+box.right)/2,box.top);ctx.restore();
+     }
+    }
+    for(const {x,y,landmark} of marks){ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.strokeRect(-5,-5,10,10);ctx.restore();points.push({x,y,landmark});}
+
    }
    if(latest?.status!=='available')return;
    const now=Date.now()/1000;const fresh=(latest.aircraft||[]).filter(a=>now-a.position_epoch>=0&&now-a.position_epoch<=30);state.textContent=requestFailed?'Reconnecting…':now-latest.sampled_epoch>30?'Feed delayed':fresh.length+' aircraft';
