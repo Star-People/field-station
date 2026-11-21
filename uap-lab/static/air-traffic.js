@@ -43,7 +43,7 @@
    ctx.globalAlpha=.24;ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.moveTo(cx,cy-r);ctx.lineTo(cx,cy+r);ctx.stroke();ctx.globalAlpha=1;
    for(const [label,x,y] of [['N',cx,26],['E',502,cy+6],['S',cx,508],['W',18,cy+6]])ctx.fillText(label,x,y);
    ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
-   const range=latest?.radius_nm||75;ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(range+' nm',464,468);
+   const range=latest?.radius_nm||(10/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi',464,468);
    if(latest?.status!=='available')return;
    const now=Date.now()/1000;
    for(const a of latest.aircraft||[]){

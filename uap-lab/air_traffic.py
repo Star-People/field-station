@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError
 
 DEFAULT = dict(address='Stanford Dish, Stanford, CA', latitude=37.4083, longitude=-122.179,
-               radius_nm=75, enabled=True)
+               radius_nm=10 / 1.150779448, enabled=True)
 PROVIDER='adsb.fi'
 PROVIDER_URL='https://adsb.fi/'
 MAX_AGE=30
@@ -73,6 +73,10 @@ def normalize(payload, config, now):
         lat,lon,seen=raw.get('lat'),raw.get('lon'),raw.get('seen_pos')
         if not all(number(v) for v in (lat,lon,seen)) or not -90<=lat<=90 or not -180<=lon<=180 or not 0<=seen<=MAX_AGE:continue
         if raw.get('alt_baro')=='ground':continue
+        p1,p2=math.radians(config['latitude']),math.radians(lat)
+        dp=p2-p1;dl=math.radians(lon-config['longitude'])
+        distance_nm=3440.065*2*math.asin(min(1,math.sqrt(math.sin(dp/2)**2+math.cos(p1)*math.cos(p2)*math.sin(dl/2)**2)))
+        if distance_nm>config['radius_nm']:continue
         position_epoch=timestamp-seen
         if now-position_epoch>MAX_AGE:continue
         row={k:str(raw[k]).strip()[:40] for k in ('hex','flight','r','t') if raw.get(k) is not None}
@@ -147,7 +151,7 @@ def detection(root, folder, event):
 
 def collect_once(root):
     config=settings(root)
-    url=f"https://opendata.adsb.fi/api/v3/lat/{config['latitude']}/lon/{config['longitude']}/dist/{config['radius_nm']}"
+    url=f"https://opendata.adsb.fi/api/v3/lat/{config['latitude']}/lon/{config['longitude']}/dist/{math.ceil(config['radius_nm'])}"
     snapshot=normalize(fetch_json(url),config,time.time());store(root,snapshot)
     return snapshot
 

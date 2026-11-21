@@ -16,7 +16,7 @@ def collect_due(root):
     a.atomic(state_path,dict(status='requesting',next_attempt=now+INTERVAL))
     try:
         config=a.settings(root)
-        url=f"https://api.adsb.lol/v2/point/{config['latitude']}/{config['longitude']}/{config['radius_nm']}"
+        url=f"https://api.adsb.lol/v2/point/{config['latitude']}/{config['longitude']}/{math.ceil(config['radius_nm'])}"
         snap=a.normalize(a.fetch_json(url),config,time.time())
         snap.update(provider=PROVIDER,provider_url='https://www.adsb.lol/',license='ODbL-1.0',license_url=LICENSE)
         a.store(root,snap,namespace='public-')
