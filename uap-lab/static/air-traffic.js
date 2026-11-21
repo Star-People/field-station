@@ -46,16 +46,17 @@
    const bearing=Math.atan2(Math.sin(dl)*Math.cos(p2),Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl));return {distance,bearing};
   }
   function draw(){
+   const heading=Number.isFinite(latest?.camera_azimuth_deg)?radians(latest.camera_azimuth_deg):0;
    const color=getComputedStyle(panel).color,cx=260,cy=260,r=218;ctx.clearRect(0,0,520,520);ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=1.5;ctx.font=(canvas.clientWidth<180?'28':'19')+'px "IBM Plex Mono", monospace';ctx.textAlign='center';points=[];
    for(const fraction of [1/3,2/3,1]){ctx.globalAlpha=.32;ctx.beginPath();ctx.arc(cx,cy,r*fraction,0,Math.PI*2);ctx.stroke();}
    ctx.globalAlpha=.24;ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.moveTo(cx,cy-r);ctx.lineTo(cx,cy+r);ctx.stroke();ctx.globalAlpha=1;
-   for(const [label,x,y] of [['N',cx,26],['E',502,cy+6],['S',cx,508],['W',18,cy+6]])ctx.fillText(label,x,y);
+   for(const [label,degrees] of [['N',0],['E',90],['S',180],['W',270]]){const angle=radians(degrees)-heading;ctx.fillText(label,cx+Math.sin(angle)*242,cy-Math.cos(angle)*242+6);}
    ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
    const range=latest?.radius_nm||(15/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi radius',464,468);
-   if(Number.isFinite(latest?.camera_azimuth_deg)){const angle=radians(latest.camera_azimuth_deg),x=cx+Math.sin(angle)*r,y=cy-Math.cos(angle)*r;ctx.save();ctx.setLineDash([8,7]);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(x,y);ctx.stroke();ctx.restore();ctx.textAlign='left';ctx.font='20px \"IBM Plex Mono\", monospace';ctx.fillText('Camera '+latest.camera_azimuth_deg+'°',26,48);}
+   if(Number.isFinite(latest?.camera_azimuth_deg)){const angle=0,x=cx+Math.sin(angle)*r,y=cy-Math.cos(angle)*r;ctx.save();ctx.setLineDash([8,7]);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(x,y);ctx.stroke();ctx.restore();ctx.textAlign='left';ctx.font='20px \"IBM Plex Mono\", monospace';ctx.fillText('Camera '+latest.camera_azimuth_deg+'°',26,48);}
    if(latest?.center){
     const labels=[];ctx.font=(canvas.clientWidth<180?'25':'18')+'px "IBM Plex Mono", monospace';
-    for(const landmark of latest.landmarks||[]){const p=position(landmark,latest.center);if(p.distance>range)continue;const x=cx+Math.sin(p.bearing)*p.distance/range*r,y=cy-Math.cos(p.bearing)*p.distance/range*r;
+    for(const landmark of latest.landmarks||[]){const p=position(landmark,latest.center);if(p.distance>range)continue;const x=cx+Math.sin(p.bearing-heading)*p.distance/range*r,y=cy-Math.cos(p.bearing-heading)*p.distance/range*r;
      ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.strokeRect(-5,-5,10,10);ctx.restore();points.push({x,y,landmark});
      const label=landmark.label.length>18?landmark.label.slice(0,17)+'…':landmark.label;ctx.textAlign=x>cx?'right':'left';const lx=x+(x>cx?-12:12);let ly=y-12;while(labels.some(v=>Math.abs(v.y-ly)<26&&Math.abs(v.x-lx)<160))ly+=26;if(ly<475){ctx.fillText(label,lx,ly);labels.push({x:lx,y:ly});}
     }
@@ -65,15 +66,15 @@
    for(const a of latest.aircraft||[]){
     if(now-a.position_epoch>30)continue;
     const p=position(a,latest.center);if(p.distance>range)continue;
-    const x=cx+Math.sin(p.bearing)*p.distance/range*r,y=cy-Math.cos(p.bearing)*p.distance/range*r;points.push({x,y,a});
+    const x=cx+Math.sin(p.bearing-heading)*p.distance/range*r,y=cy-Math.cos(p.bearing-heading)*p.distance/range*r;points.push({x,y,a});
     ctx.save();ctx.translate(x,y);if(canvas.clientWidth<180)ctx.scale(1.5,1.5);ctx.beginPath();
-    if(Number.isFinite(a.track_deg)){ctx.rotate(radians(a.track_deg));ctx.moveTo(0,-9);ctx.lineTo(6,6);ctx.lineTo(0,3);ctx.lineTo(-6,6);ctx.closePath();}else ctx.arc(0,0,4,0,Math.PI*2);
+    if(Number.isFinite(a.track_deg)){ctx.rotate(radians(a.track_deg)-heading);ctx.moveTo(0,-9);ctx.lineTo(6,6);ctx.lineTo(0,3);ctx.lineTo(-6,6);ctx.closePath();}else ctx.arc(0,0,4,0,Math.PI*2);
     ctx.fill();ctx.restore();
    }
   }
   function showAt(event){const rect=canvas.getBoundingClientRect(),x=(event.clientX-rect.left)*520/rect.width,y=(event.clientY-rect.top)*520/rect.height;let hit=null,d=28;for(const p of points){const n=Math.hypot(p.x-x,p.y-y);if(n<d){hit=p;d=n;}}if(!hit){tip.hidden=true;return;}if(hit.landmark){tip.textContent=hit.landmark.label+' · '+hit.landmark.address;tip.hidden=false;return;}const a=hit.a;tip.textContent=[a.flight||a.r||a.hex,a.t,Number.isFinite(a.altitude_ft)?Math.round(a.altitude_ft).toLocaleString()+' ft':null,Number.isFinite(a.speed_knots)?Math.round(a.speed_knots)+' kt':null,Number.isFinite(a.track_deg)?Math.round(a.track_deg)+'° track':null].filter(Boolean).join(' · ');tip.hidden=false;}
   canvas.addEventListener('pointermove',showAt);canvas.addEventListener('click',showAt);canvas.addEventListener('pointerleave',()=>tip.hidden=true);
-  async function refresh(){clearTimeout(timer);if(busy)return;busy=true;try{latest=await api('/api/air-traffic');state.textContent=latest.status==='available'?(latest.aircraft.length+' aircraft'):latest.status==='stale'?'Feed delayed':latest.status==='waiting'?'Updating center…':'Unavailable';center.textContent=(latest.center?.address||'').split(',')[0];center.title=latest.center?.address||'';canvas.setAttribute('aria-label',`North-up aircraft radar. ${state.textContent}. Arrows show reported ground track.`);}catch(e){latest=null;state.textContent='Unavailable';}finally{busy=false;draw();timer=setTimeout(refresh,15000);}}
+  async function refresh(){clearTimeout(timer);if(busy)return;busy=true;try{latest=await api('/api/air-traffic');state.textContent=latest.status==='available'?(latest.aircraft.length+' aircraft'):latest.status==='stale'?'Feed delayed':latest.status==='waiting'?'Updating center…':'Unavailable';center.textContent=(latest.center?.address||'').split(',')[0];center.title=latest.center?.address||'';canvas.setAttribute('aria-label',`${Number.isFinite(latest.camera_azimuth_deg)?'Camera-up':'North-up'} aircraft radar. ${state.textContent}. Arrows show reported ground track.`);}catch(e){latest=null;state.textContent='Unavailable';}finally{busy=false;draw();timer=setTimeout(refresh,15000);}}
   window.addEventListener('radar-center-changed',()=>{latest=null;draw();refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});ink();refresh();setInterval(draw,5000);
  }
  const key=new URLSearchParams(location.search).get('id');

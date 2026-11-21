@@ -23,15 +23,18 @@ class AircraftOverlay:
   canvas=Image.new('RGBA',(460,490));draw=ImageDraw.Draw(canvas);cx,cy,r=230,252,182
   draw.text((0,0),'Air traffic',font=self.font,fill=ink)
   draw.text((460,2),f'{int(age)}s ago' if valid else 'Data unavailable',font=self.small,fill=ink,anchor='rt')
+  azimuth=self.config.get('camera_azimuth_deg')
+  oriented=isinstance(azimuth,(int,float)) and not isinstance(azimuth,bool) and math.isfinite(azimuth) and 0<=azimuth<360
+  heading=math.radians(azimuth) if oriented else 0
   faint=(*ink[:3],90)
   for fraction in (1/3,2/3,1):
    rr=r*fraction;draw.ellipse((cx-rr,cy-rr,cx+rr,cy+rr),outline=faint,width=2)
   draw.line((cx-r,cy,cx+r,cy),fill=faint,width=1);draw.line((cx,cy-r,cx,cy+r),fill=faint,width=1)
-  for label,x,y in [('N',cx,42),('E',442,cy),('S',cx,454),('W',18,cy)]:draw.text((x,y),label,font=self.small,fill=ink,anchor='mm')
+  for label,degrees in [('N',0),('E',90),('S',180),('W',270)]:
+   angle=math.radians(degrees)-heading;draw.text((cx+math.sin(angle)*210,cy-math.cos(angle)*210),label,font=self.small,fill=ink,anchor='mm')
   draw.ellipse((cx-3,cy-3,cx+3,cy+3),fill=ink)
-  azimuth=self.config.get('camera_azimuth_deg')
-  if isinstance(azimuth,(int,float)) and not isinstance(azimuth,bool) and math.isfinite(azimuth) and 0<=azimuth<360:
-   angle=math.radians(azimuth)
+  if oriented:
+   angle=0
    for start in range(0,r,15):
     end=min(start+8,r);draw.line((cx+math.sin(angle)*start,cy-math.cos(angle)*start,cx+math.sin(angle)*end,cy-math.cos(angle)*end),fill=ink,width=2)
    draw.text((0,28),f'Camera {azimuth:g}°',font=self.small,fill=ink)
@@ -43,10 +46,10 @@ class AircraftOverlay:
     distance=3440.065*2*math.asin(math.sqrt(max(0,min(1,h))))
     if distance>radius:continue
     bearing=math.atan2(math.sin(dl)*math.cos(p2),math.cos(p1)*math.sin(p2)-math.sin(p1)*math.cos(p2)*math.cos(dl))
-    x=cx+math.sin(bearing)*distance/radius*r;y=cy-math.cos(bearing)*distance/radius*r
+    x=cx+math.sin(bearing-heading)*distance/radius*r;y=cy-math.cos(bearing-heading)*distance/radius*r
     track=a.get('track_deg')
     if isinstance(track,(int,float)) and math.isfinite(track):
-     theta=math.radians(track);points=[(x+px*math.cos(theta)-py*math.sin(theta),y+px*math.sin(theta)+py*math.cos(theta)) for px,py in [(0,-9),(6,6),(0,3),(-6,6)]];draw.polygon(points,fill=ink)
+     theta=math.radians(track)-heading;points=[(x+px*math.cos(theta)-py*math.sin(theta),y+px*math.sin(theta)+py*math.cos(theta)) for px,py in [(0,-9),(6,6),(0,3),(-6,6)]];draw.polygon(points,fill=ink)
     else:draw.ellipse((x-3,y-3,x+3,y+3),fill=ink)
    except (KeyError,TypeError,ValueError):continue
   draw.text((0,488),'ADSB.lol · ODbL',font=self.small,fill=ink,anchor='lb');draw.text((460,488),f'{round(radius*1.150779448)} mi radius',font=self.small,fill=ink,anchor='rb')

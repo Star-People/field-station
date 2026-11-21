@@ -18,6 +18,17 @@ class AircraftOverlayTests(unittest.TestCase):
  def test_camera_azimuth_changes_render(self):
   before=self.overlay.render((255,255,255,255),1010).tobytes();self.overlay.config['camera_azimuth_deg']=90
   self.assertNotEqual(before,self.overlay.render((255,255,255,255),1010).tobytes())
+ def test_east_up_rotates_north_left_and_east_top(self):
+  from unittest.mock import patch
+  from PIL import ImageDraw
+  original=ImageDraw.ImageDraw.text;labels={}
+  def capture(draw,xy,text,*args,**kwargs):
+   if text in ('N','E','S','W'):labels[text]=xy
+   return original(draw,xy,text,*args,**kwargs)
+  self.overlay.config['camera_azimuth_deg']=90
+  with patch.object(ImageDraw.ImageDraw,'text',capture):self.overlay.render((255,255,255,255),1010)
+  self.assertAlmostEqual(labels['N'][0],20);self.assertAlmostEqual(labels['N'][1],252)
+  self.assertAlmostEqual(labels['E'][0],230);self.assertAlmostEqual(labels['E'][1],42)
  def test_aircraft_render_changes_pixels(self):
   before=self.overlay.render((255,255,255,255),1010).tobytes();self.overlay.data['aircraft']=[]
   self.assertNotEqual(before,self.overlay.render((255,255,255,255),1010).tobytes())

@@ -1,6 +1,6 @@
 # Air traffic context
 
-The private camera feed shows a north-up ADS-B aircraft plot. Arrows indicate reported **ground track**, not the aircraft's nose orientation. Missing track data renders as a dot. Hover or tap for callsign, aircraft type, pressure altitude in feet, speed in knots, and track.
+The private camera feed shows an ADS-B aircraft plot oriented camera-up when azimuth is set, otherwise north-up. Arrows indicate reported **ground track**, not the aircraft's nose orientation. Missing track data renders as a dot. Hover or tap for callsign, aircraft type, pressure altitude in feet, speed in knots, and track.
 
 Settings → Radar center address defaults to the Stanford Dish (37.4083, -122.179). This is an operator-selected radar reference, not the automatic county-only station location. Address resolution uses OpenStreetMap Nominatim only on explicit Save; no autocomplete. The entered address and resolved point stay in the private station settings. The geocoder receives the entered address; the traffic provider receives the configured query point. Settings also exposes a radar radius from 1–100 statute miles, defaulting to 15. The radar queries a 15 statute-mile radius by default (13.03 nautical miles); provider requests round up to 14 nautical miles and reports are filtered to the exact configured radius.
 
@@ -38,4 +38,6 @@ Settings → Radar landmarks accepts an address or landmark and an optional shor
 
 Settings → Camera azimuth (° true) accepts a heading clockwise from true north, from 0 through 359.9°. Blank means unknown and hides the marker. No heading is assumed by default. Both station and YouTube radars show a dashed camera bearing and its numeric value. This is a manually entered direction only, not camera field of view, elevation, automatic tracking, or an aircraft-identification match. Changing heading preserves the radar center, radius, and saved landmarks.
 
-Camera elevation (°) stores upward tilt independently: 0° is the horizon, 90° is straight up, and negative angles point below the horizon (minimum −90°). Blank means unknown. This setting does not change the north-up radar's ground-distance projection or imply a calibrated field of view.
+Camera elevation (°) stores upward tilt independently: 0° is the horizon, 90° is straight up, and negative angles point below the horizon (minimum −90°). Blank means unknown. This setting does not change the radar's ground-distance projection or imply a calibrated field of view.
+
+When azimuth is set, its direction is at the top of both radars. Compass labels, aircraft positions and tracks, and private landmark positions rotate together. Text stays upright; an unset azimuth retains north-up.
