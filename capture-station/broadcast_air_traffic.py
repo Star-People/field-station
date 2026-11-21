@@ -1,6 +1,9 @@
 """Public aircraft radar: licensed reports only, no landmark or center labels."""
 import json,math,time
 from pathlib import Path
+import sys
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"shared"))
+from camera_optics import field_of_view
 from PIL import Image,ImageDraw,ImageFont
 
 FONT=Path(__file__).resolve().parents[1]/'uap-lab/static/fonts/IBMPlexMono-Regular.woff2'
@@ -26,6 +29,10 @@ class AircraftOverlay:
   azimuth=self.config.get('camera_azimuth_deg')
   oriented=isinstance(azimuth,(int,float)) and not isinstance(azimuth,bool) and math.isfinite(azimuth) and 0<=azimuth<360
   heading=math.radians(azimuth) if oriented else 0
+  fov=field_of_view(self.config)
+  if oriented:
+   half=fov['azimuth_span_deg']/2
+   draw.pieslice((cx-r,cy-r,cx+r,cy+r),-90-half,-90+half,fill=(*ink[:3],30),outline=(*ink[:3],140),width=1)
   faint=(*ink[:3],90)
   for fraction in (1/3,2/3,1):
    rr=r*fraction;draw.ellipse((cx-rr,cy-rr,cx+rr,cy+rr),outline=faint,width=2)
@@ -37,7 +44,7 @@ class AircraftOverlay:
    angle=0
    for start in range(0,r,15):
     end=min(start+8,r);draw.line((cx+math.sin(angle)*start,cy-math.cos(angle)*start,cx+math.sin(angle)*end,cy-math.cos(angle)*end),fill=ink,width=2)
-   draw.text((0,28),f'Camera {azimuth:g}°',font=self.small,fill=ink)
+   draw.text((0,28),f"Camera {azimuth:g}° · {fov['focal_length_mm']:g} mm",font=self.small,fill=ink)
   radius=self.config.get('radius_nm',15/1.150779448);center=self.config
   for a in reports:
    try:

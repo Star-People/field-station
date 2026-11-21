@@ -7,6 +7,19 @@ class TrafficTests(unittest.TestCase):
  def setUp(self):
   self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name);a.base(self.root).mkdir();self.now=time.time()
  def tearDown(self):self.temp.cleanup()
+ def test_focal_setting_and_projection(self):
+  first=a.field_of_view({'camera_focal_length_mm':100,'camera_elevation_deg':0})
+  self.assertAlmostEqual(first['horizontal_deg'],12.724,places=2)
+  self.assertAlmostEqual(first['azimuth_span_deg'],first['horizontal_deg'])
+  self.assertLess(a.field_of_view({'camera_focal_length_mm':400})['horizontal_deg'],3.2)
+  self.assertGreater(a.field_of_view({'camera_elevation_deg':43})['azimuth_span_deg'],first['horizontal_deg'])
+  self.assertEqual(a.field_of_view({'camera_elevation_deg':90})['azimuth_span_deg'],360)
+  a.save_settings(self.root,{'address':a.DEFAULT['address'],'camera_focal_length_mm':400})
+  self.assertEqual(a.live(self.root)['camera_fov']['focal_length_mm'],400)
+  before=a.settings(self.root)
+  for value in [0,401,True,float('nan')]:
+   with self.assertRaises(ValueError):a.save_settings(self.root,{'address':a.DEFAULT['address'],'camera_focal_length_mm':value})
+   self.assertEqual(a.settings(self.root),before)
  def payload(self,**kw):
   row=dict(hex='abc123',flight='UAL123 ',lat=37.4,lon=-122.18,alt_baro=10000,gs=200,track=0,seen_pos=1);row.update(kw)
   return dict(now=self.now*1000,ac=[row])
