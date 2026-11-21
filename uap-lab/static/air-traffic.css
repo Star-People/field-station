@@ -7,3 +7,5 @@
 .radar-landmark-settings{margin-top:20px}.radar-landmark-settings>label{display:block;margin-bottom:8px;font-size:12px}.radar-landmark-settings>input{box-sizing:border-box;width:100%;margin-bottom:8px;padding:8px;font:inherit;background:transparent;color:inherit;border:1px solid currentColor;border-radius:4px}.radar-landmark-list{list-style:none;margin:0;padding:0}.radar-landmark-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;font-size:12px}.radar-landmark-list span{min-width:0;overflow-wrap:anywhere}.radar-landmark-list button{font:inherit;color:inherit;background:transparent;border:1px solid currentColor;border-radius:4px;padding:5px 8px;flex-shrink:0}
 
 .air-traffic-settings>.radar-address-row+label,.air-traffic-settings>p+label{margin-top:20px}.air-traffic-settings #cameraAzimuthHelp,.air-traffic-settings #cameraElevationHelp{margin-top:6px;margin-bottom:0}
+
+.air-radar-center{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.5}.air-traffic-settings #radarResolvedAddress{margin-top:6px;margin-bottom:0}

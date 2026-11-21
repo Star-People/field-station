@@ -69,6 +69,12 @@ class TrafficTests(unittest.TestCase):
   a.save_settings(self.root,dict(action='add_landmark',address='Stanford Dish'))
   result=a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_elevation_deg=45))
   self.assertEqual(result['camera_azimuth_deg'],180);self.assertEqual(len(result['landmarks']),1);self.assertAlmostEqual(result['radius_nm']*1.150779448,20)
+ def test_live_includes_full_resolved_address(self):
+  config=dict(a.DEFAULT,resolved_address='Example trail, City, County, State, Country')
+  a.atomic(a.base(self.root)/'settings.json',config)
+  self.assertEqual(a.live(self.root)['center']['resolved_address'],config['resolved_address'])
+  a.store(self.root,self.snapshot())
+  self.assertEqual(a.live(self.root)['center']['resolved_address'],config['resolved_address'])
  def test_ground_excluded(self):self.assertEqual(a.normalize(self.payload(alt_baro='ground'),a.DEFAULT,self.now)['aircraft'],[])
  def test_stale_position_excluded(self):self.assertEqual(a.normalize(self.payload(seen_pos=31),a.DEFAULT,self.now)['aircraft'],[])
  def test_missing_direction_is_not_north(self):

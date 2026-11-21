@@ -154,7 +154,8 @@ def live(root, now=None):
     now=time.time() if now is None else now
     result=read(base(root)/'latest.json',{'status':'unavailable','aircraft':[]})
     config=settings(root)
-    if result.get('center_id')!=center_id(config):return dict(status='waiting',aircraft=[],center=dict(address=config['address'],latitude=config['latitude'],longitude=config['longitude']),radius_nm=config['radius_nm'],landmarks=config.get('landmarks',[]),camera_azimuth_deg=config.get('camera_azimuth_deg'),camera_elevation_deg=config.get('camera_elevation_deg'))
+    if result.get('center_id')!=center_id(config):return dict(status='waiting',aircraft=[],center=dict(address=config['address'],resolved_address=config.get('resolved_address',config['address']),latitude=config['latitude'],longitude=config['longitude']),radius_nm=config['radius_nm'],landmarks=config.get('landmarks',[]),camera_azimuth_deg=config.get('camera_azimuth_deg'),camera_elevation_deg=config.get('camera_elevation_deg'))
+    result['center']=dict(address=config['address'],resolved_address=config.get('resolved_address',config['address']),latitude=config['latitude'],longitude=config['longitude'])
     result['landmarks']=config.get('landmarks',[])
     result['camera_azimuth_deg']=config.get('camera_azimuth_deg')
     result['camera_elevation_deg']=config.get('camera_elevation_deg')
