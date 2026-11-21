@@ -4,10 +4,10 @@ from pathlib import Path
 from urllib.request import urlopen
 from PIL import Image,ImageDraw,ImageFont
 
-WIDTH=420
-HEIGHT=204
-RIGHT=30
-BOTTOM=26
+WIDTH=230
+HEIGHT=112
+LEFT=1020
+BOTTOM=484
 OUTPUT_WIDTH=1280
 OUTPUT_HEIGHT=720
 FONT=Path(__file__).resolve().parents[1]/'uap-lab/static/fonts/IBMPlexMono-Regular.woff2'
@@ -17,11 +17,11 @@ def finite(value):
 
 class SpectrumOverlay:
  def __init__(self):
-  self.bright=False;self.font=ImageFont.truetype(str(FONT),28);self.small=ImageFont.truetype(str(FONT),24)
+  self.bright=False;self.font=ImageFont.truetype(str(FONT),40);self.small=ImageFont.truetype(str(FONT),32)
  def palette(self,frame):
   if frame is not None:
    w,h=frame.size
-   box=(int(w*(1280-RIGHT-WIDTH)/1280),int(h*(720-BOTTOM-HEIGHT)/720),int(w*(1280-RIGHT)/1280),int(h*(720-BOTTOM)/720))
+   box=(int(w*LEFT/1280),int(h*(720-BOTTOM-HEIGHT)/720),int(w*(LEFT+WIDTH)/1280),int(h*(720-60)/720))
    pixels=list(frame.convert('RGB').crop(box).resize((32,16)).getdata())
    light=sum(.2126*r+.7152*g+.0722*b for r,g,b in pixels)/(255*len(pixels))
    if light>.65:self.bright=True
@@ -62,16 +62,21 @@ class SpectrumOverlay:
 
 class OverlayPipe:
  def __init__(self,rf_path,preview_url=None,camera=None,tags_url='http://127.0.0.1:8091/api/live/status'):
+  from broadcast_air_traffic import AircraftOverlay
   from broadcast_tags import TagOverlay
   from broadcast_watermark import Watermark
   self.tags_url=tags_url;self.tags={};self.tag_renderer=TagOverlay();self.watermark=Watermark()
+  self.aircraft=AircraftOverlay(Path(rf_path).parent.parent)
   self.camera=camera;self.rf_path=Path(rf_path);self.preview_url=preview_url;self.stop=threading.Event();self.renderer=SpectrumOverlay();self.frame=self.compose(self.renderer.render({}),True).tobytes();self.reader,self.writer=os.pipe()
  def compose(self,rf,standby=False,frame=None):
   canvas=Image.new('RGBA',(OUTPUT_WIDTH,OUTPUT_HEIGHT))
   self.watermark.draw(canvas,frame,standby,location_ink=(155,201,140,255) if standby else ((17,17,17,255) if self.renderer.bright else (255,255,255,255)))
+  self.aircraft.draw(canvas,(155,201,140,255) if standby else ((17,17,17,255) if self.renderer.bright else (255,255,255,255)))
   self.tag_renderer.draw(canvas,self.tags,time.time(),standby)
-  if standby:ImageDraw.Draw(canvas).rectangle((OUTPUT_WIDTH-RIGHT-WIDTH-10,OUTPUT_HEIGHT-BOTTOM-HEIGHT-10,OUTPUT_WIDTH-RIGHT+10,OUTPUT_HEIGHT-BOTTOM+10),fill=(8,19,13,242),outline=(155,201,140,255),width=1)
-  canvas.alpha_composite(rf,(OUTPUT_WIDTH-RIGHT-WIDTH,OUTPUT_HEIGHT-BOTTOM-HEIGHT))
+  if standby:ImageDraw.Draw(canvas).rectangle((LEFT-10,OUTPUT_HEIGHT-BOTTOM-HEIGHT-10,LEFT+WIDTH+10,OUTPUT_HEIGHT-BOTTOM+10),fill=(8,19,13,242),outline=(155,201,140,255),width=1)
+  canvas.alpha_composite(rf,(LEFT,OUTPUT_HEIGHT-BOTTOM-HEIGHT))
+  ink=(155,201,140,255) if standby else ((17,17,17,255) if self.renderer.bright else (255,255,255,255))
+  ImageDraw.Draw(canvas).line((LEFT,OUTPUT_HEIGHT-BOTTOM+7,LEFT+WIDTH-1,OUTPUT_HEIGHT-BOTTOM+7),fill=ink,width=1)
   return canvas
  def poll_tags(self):
   while not self.stop.is_set():
