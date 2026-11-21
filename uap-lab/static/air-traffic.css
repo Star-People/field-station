@@ -14,7 +14,7 @@
 #liveViewer #cameraLocation{display:none!important}
 
 /* One ordered telemetry column: spectrum, plan view, elevation view. */
-#liveTelemetry{position:absolute;left:max(20px,env(safe-area-inset-left));bottom:max(20px,env(safe-area-inset-bottom));z-index:3;width:250px;display:flex;flex-direction:column;gap:16px;max-height:calc(100% - 100px);overflow-y:auto;scrollbar-width:thin;box-sizing:border-box}
+#liveTelemetry{position:absolute;left:auto;right:max(20px,env(safe-area-inset-right));bottom:max(20px,env(safe-area-inset-bottom));z-index:3;width:250px;display:flex;flex-direction:column;gap:16px;max-height:calc(100% - 100px);overflow-y:auto;scrollbar-width:thin;box-sizing:border-box}
 #liveTelemetry>.rf-overlay,#liveTelemetry>.air-radar{position:relative;inset:auto;width:100%;min-width:0;max-width:none;margin:0;box-sizing:border-box;flex:none}
 #liveTelemetry>.rf-overlay{padding:0}
-@media(max-width:600px){#liveTelemetry{left:10px;bottom:max(10px,env(safe-area-inset-bottom));width:170px;gap:12px;max-height:calc(100% - 76px)}}
+@media(max-width:600px){#liveTelemetry{left:auto;right:10px;bottom:max(10px,env(safe-area-inset-bottom));width:170px;gap:12px;max-height:calc(100% - 76px)}}

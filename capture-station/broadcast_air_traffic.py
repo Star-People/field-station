@@ -112,4 +112,4 @@ class AircraftOverlay:
   if self.terrain_source=='Copernicus / Open-Meteo':draw.text((0,810),'Terrain: Copernicus / Open-Meteo',font=self.small,fill=ink,anchor='lb')
   return canvas.resize((230,410),Image.Resampling.LANCZOS)
  def draw(self,canvas,ink):
-  self.read();canvas.alpha_composite(self.render(ink),(30,canvas.height-470))
+  self.read();canvas.alpha_composite(self.render(ink),(canvas.width-260,canvas.height-470))
