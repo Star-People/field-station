@@ -9,3 +9,6 @@
 .air-traffic-settings>.radar-address-row+label,.air-traffic-settings>p+label{margin-top:20px}.air-traffic-settings #cameraAzimuthHelp,.air-traffic-settings #cameraElevationHelp{margin-top:6px;margin-bottom:0}
 
 .air-radar-center{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.5}.air-traffic-settings #radarResolvedAddress{margin-top:6px;margin-bottom:0}
+
+/* The private radar already displays its configured center. */
+#liveViewer #cameraLocation{display:none!important}
