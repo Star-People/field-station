@@ -27,6 +27,26 @@ class TrafficTests(unittest.TestCase):
   self.assertEqual(a.live(self.root)['status'],'available')
   self.assertEqual(a.live(self.root)['sampled_epoch'],result['sampled_epoch'])
   self.assertEqual(a.read(a.base(self.root)/'history-status.json')['status'],'retrying')
+ def test_terrain_cache_tracks_center_and_overrides(self):
+  with patch.object(a,'fetch_json',return_value={'value':'200.5'}):a.refresh_elevation(self.root)
+  self.assertEqual(a.station_elevation(self.root)['camera_altitude_ft'],200.5)
+  c=dict(a.DEFAULT,latitude=38)
+  self.assertEqual(a.station_elevation(self.root,c)['status'],'unknown')
+  c.update(station_altitude_ft=100,camera_height_ft=12)
+  self.assertEqual(a.station_elevation(self.root,c)['camera_altitude_ft'],112)
+ def test_invalid_ground_settings_preserve_state(self):
+  before=a.settings(self.root)
+  for value in [float('nan'),True,40000]:
+   with self.assertRaises(ValueError):a.save_settings(self.root,dict(address=a.DEFAULT['address'],station_altitude_ft=value))
+   self.assertEqual(a.settings(self.root),before)
+ def test_bad_terrain_is_not_sea_level(self):
+  with patch.object(a,'fetch_json',return_value={'value':'-1000000'}):a.refresh_elevation(self.root)
+  self.assertIsNone(a.station_elevation(self.root)['camera_altitude_ft'])
+ def test_terrain_fallback_converts_meters_to_feet(self):
+  with patch.object(a,'fetch_json',side_effect=[OSError('timeout'),{'elevation':[100]}]):a.refresh_elevation(self.root)
+  result=a.station_elevation(self.root)
+  self.assertAlmostEqual(result['camera_altitude_ft'],100/.3048)
+  self.assertEqual(result['source'],'Copernicus / Open-Meteo')
  def payload(self,**kw):
   row=dict(hex='abc123',flight='UAL123 ',lat=37.4,lon=-122.18,alt_baro=10000,gs=200,track=0,seen_pos=1);row.update(kw)
   return dict(now=self.now*1000,ac=[row])

@@ -222,6 +222,6 @@
 })();
 
 // Aircraft radar and private center settings.
-if(window.FIELD_PUBLIC_READ_ONLY!==true){const script=document.createElement("script");script.src="/air-traffic.js?v=camera-fov-10";document.head.append(script);}
+if(window.FIELD_PUBLIC_READ_ONLY!==true){const script=document.createElement("script");script.src="/air-traffic.js?v=camera-side-13";document.head.append(script);}
 
 if(window.FIELD_PUBLIC_READ_ONLY!==true&&document.querySelector(".observation-metrics")){const script=document.createElement("script");script.src="/drive-storage.js?v=1";document.head.append(script);}

@@ -74,6 +74,12 @@ def save_settings(root, value):
         if elevation is not None and (not number(elevation) or not -90<=elevation<=90):raise ValueError('Camera elevation must be between −90° and 90°, or blank.')
         focal=value.get('camera_focal_length_mm',config.get('camera_focal_length_mm',100))
         if not number(focal) or not 100<=focal<=400:raise ValueError('Lens focal length must be between 100 and 400 mm.')
+        altitude=value.get('station_altitude_ft',config.get('station_altitude_ft'))
+        height=value.get('camera_height_ft',config.get('camera_height_ft',0))
+        if altitude is not None and (not number(altitude) or not -1500<=altitude<=30000):raise ValueError('Station ground altitude must be −1,500 to 30,000 feet above sea level, or blank for automatic.')
+        if not number(height) or not 0<=height<=2000:raise ValueError('Camera height must be 0–2,000 feet above ground.')
+        config['station_altitude_ft']=altitude
+        config['camera_height_ft']=height
         config['camera_focal_length_mm']=focal
         config['camera_elevation_deg']=elevation
         config['camera_azimuth_deg']=azimuth
@@ -162,12 +168,13 @@ def live(root, now=None):
     now=time.time() if now is None else now
     result=read(base(root)/'latest.json',{'status':'unavailable','aircraft':[]})
     config=settings(root)
-    if result.get('center_id')!=center_id(config):return dict(status='waiting',aircraft=[],center=dict(address=config['address'],resolved_address=config.get('resolved_address',config['address']),latitude=config['latitude'],longitude=config['longitude']),radius_nm=config['radius_nm'],landmarks=config.get('landmarks',[]),camera_azimuth_deg=config.get('camera_azimuth_deg'),camera_elevation_deg=config.get('camera_elevation_deg'),camera_fov=field_of_view(config))
+    if result.get('center_id')!=center_id(config):return dict(status='waiting',aircraft=[],center=dict(address=config['address'],resolved_address=config.get('resolved_address',config['address']),latitude=config['latitude'],longitude=config['longitude']),radius_nm=config['radius_nm'],landmarks=config.get('landmarks',[]),camera_azimuth_deg=config.get('camera_azimuth_deg'),camera_elevation_deg=config.get('camera_elevation_deg'),camera_fov=field_of_view(config),station_elevation=station_elevation(root,config))
     result['center']=dict(address=config['address'],resolved_address=config.get('resolved_address',config['address']),latitude=config['latitude'],longitude=config['longitude'])
     result['landmarks']=config.get('landmarks',[])
     result['camera_azimuth_deg']=config.get('camera_azimuth_deg')
     result['camera_elevation_deg']=config.get('camera_elevation_deg')
     result['camera_fov']=field_of_view(config)
+    result['station_elevation']=station_elevation(root,config)
     result['age_seconds']=round(max(0,now-result.get('sampled_epoch',0)),1)
     if result['age_seconds']>MAX_AGE:result.update(status='stale',aircraft=[])
     else:result['aircraft']=[a for a in result.get('aircraft',[]) if 0<=now-a['position_epoch']<=MAX_AGE]
@@ -237,12 +244,46 @@ def refresh_region(root):
         except (OSError,ValueError,TypeError):pass
         atomic(path,value)
 
+def station_elevation(root,config=None):
+    config=settings(root) if config is None else config
+    ground=config.get('station_altitude_ft');source='manual'
+    if not number(ground):
+        cached=read(base(root)/'terrain-elevation.json',{})
+        ground=cached.get('ground_altitude_ft') if cached.get('center_key')==region_key(config) else None
+        source=cached.get('source','USGS terrain')
+    height=config.get('camera_height_ft',0)
+    if not number(height):height=0
+    return dict(status='known' if number(ground) else 'unknown',source=source,
+                ground_altitude_ft=ground,camera_height_ft=height,
+                camera_altitude_ft=ground+height if number(ground) else None)
+
+def refresh_elevation(root,force=False):
+    config=settings(root)
+    if number(config.get('station_altitude_ft')):return
+    key=region_key(config);path=base(root)/'terrain-elevation.json';old=read(path,{})
+    if not force and old.get('center_key')==key and (number(old.get('ground_altitude_ft')) or time.time()<old.get('retry_after',0)):return
+    result=dict(center_key=key,status='unknown',retry_after=time.time()+3600)
+    try:
+        response=fetch_json('https://epqs.nationalmap.gov/v1/json?'+urlencode(dict(x=config['longitude'],y=config['latitude'],wkid=4326,units='Feet',includeDate='false')))
+        ground=float(response['value'])
+        if not math.isfinite(ground) or not -1500<=ground<=30000:raise ValueError('Elevation unavailable')
+        result.update(status='known',ground_altitude_ft=ground,source='USGS terrain',updated_epoch=time.time())
+    except (OSError,ValueError,TypeError,KeyError):
+        try:
+            response=fetch_json('https://api.open-meteo.com/v1/elevation?'+urlencode(dict(latitude=config['latitude'],longitude=config['longitude'])))
+            ground=float(response['elevation'][0])/0.3048
+            if not math.isfinite(ground) or not -1500<=ground<=30000:raise ValueError('Elevation unavailable')
+            result.update(status='known',ground_altitude_ft=ground,source='Copernicus / Open-Meteo',updated_epoch=time.time())
+        except (OSError,ValueError,TypeError,KeyError,IndexError):pass
+    atomic(path,result)
+
 def collect_auxiliary(root):
     # Public-provider and geocoding latency must not delay private radar reports.
     try:
         from air_traffic_archive import collect_due
         collect_due(root)
         refresh_region(root)
+        refresh_elevation(root)
     except Exception:
         pass
 

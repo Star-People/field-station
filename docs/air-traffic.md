@@ -43,3 +43,23 @@ Settings → Camera azimuth (° true) accepts a heading clockwise from true nort
 Camera elevation (°) stores upward tilt independently: 0° is the horizon, 90° is straight up, and negative angles point below the horizon (minimum −90°). Blank means unknown. This setting does not change the radar's ground-distance projection or imply a calibrated field of view.
 
 When azimuth is set, its direction is at the top of both radars. Compass labels, aircraft positions and tracks, and private landmark positions rotate together. Text stays upright; an unset azimuth retains north-up.
+
+### Side view and estimated camera matches
+
+The side view plots ground distance against estimated height above the camera,
+with equal physical scales on both axes. It includes only aircraft in the camera's
+horizontal bearing envelope; outlined aircraft pass the full rectangular optical
+frustum test (azimuth, elevation, and focal length). Aircraft above the chart's
+height limit are outside the plotted viewport, not necessarily outside the FoV.
+
+Ground elevation is cached from the USGS Elevation Point Query Service for the
+configured radar center, with [Copernicus / Open-Meteo](https://open-meteo.com/en/docs/elevation-api) as a fallback if USGS is unavailable. Changing the center invalidates the cached elevation.
+Settings can override ground altitude in feet above sea level and specify camera
+height above ground. Missing altitude or orientation is unknown, not a match.
+
+Calculations use reported pressure altitude, terrain elevation, and spherical
+Earth curvature. These altitude datums are not exact equivalents: weather,
+refraction, and terrain obstruction are not modeled. This is estimated aircraft
+context, not proof that the optical detection is an aircraft. The YouTube side
+view uses only the licensed public aircraft feed and does not show private
+landmarks, coordinates, or the station's absolute altitude.

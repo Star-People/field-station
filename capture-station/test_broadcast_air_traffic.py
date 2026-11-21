@@ -8,8 +8,8 @@ class AircraftOverlayTests(unittest.TestCase):
  def test_counts_match_plotted_aircraft_and_bearing_wedge(self):
   from unittest.mock import patch
   from PIL import ImageDraw
-  self.overlay.config.update(latitude=0,longitude=0,camera_azimuth_deg=0)
-  self.overlay.data['aircraft']=[dict(latitude=.05,longitude=.001),dict(latitude=.1,longitude=-.001),dict(latitude=0,longitude=.1),dict(latitude=40,longitude=40)]
+  self.overlay.config.update(latitude=0,longitude=0,camera_azimuth_deg=0,camera_elevation_deg=0);self.overlay.station_altitude_ft=0
+  self.overlay.data['aircraft']=[dict(latitude=.05,longitude=.001,altitude_ft=0),dict(latitude=.1,longitude=-.001,altitude_ft=0),dict(latitude=0,longitude=.1),dict(latitude=40,longitude=40)]
   original=ImageDraw.ImageDraw.text;labels=[]
   def capture(draw,xy,text,*args,**kwargs):
    labels.append(text);return original(draw,xy,text,*args,**kwargs)

@@ -1,21 +1,31 @@
 """Public aircraft radar: licensed reports only, no landmark or center labels."""
-import json,math,time
+import json,math,time,hashlib
 from pathlib import Path
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"shared"))
-from camera_optics import field_of_view
+from camera_optics import field_of_view, aircraft_view
 from PIL import Image,ImageDraw,ImageFont
 
 FONT=Path(__file__).resolve().parents[1]/'uap-lab/static/fonts/IBMPlexMono-Regular.woff2'
 class AircraftOverlay:
  def __init__(self,root):
-  self.root=Path(root)/'air-traffic';self.checked=-float('inf');self.data={};self.config={}
+  self.root=Path(root)/'air-traffic';self.checked=-float('inf');self.data={};self.config={};self.station_altitude_ft=None;self.terrain_source=None
   self.font=ImageFont.truetype(str(FONT),22);self.small=ImageFont.truetype(str(FONT),18)
  def read(self):
   if time.monotonic()-self.checked<2:return
   self.checked=time.monotonic()
   try:self.data=json.loads((self.root/'public-latest.json').read_text());self.config=json.loads((self.root/'settings.json').read_text())
-  except (OSError,ValueError):self.data={};self.config={}
+  except (OSError,ValueError):self.data={};self.config={};self.station_altitude_ft=None;self.terrain_source=None
+  self.station_altitude_ft=None;self.terrain_source=None
+  ground=self.config.get('station_altitude_ft')
+  if not isinstance(ground,(int,float)):
+   try:
+    terrain=json.loads((self.root/'terrain-elevation.json').read_text())
+    key=hashlib.sha256(json.dumps([self.config['latitude'],self.config['longitude']]).encode()).hexdigest()[:16]
+    ground=terrain.get('ground_altitude_ft') if terrain.get('center_key')==key else None
+    if ground is not None:self.terrain_source=terrain.get('source')
+   except (OSError,ValueError,KeyError):ground=None
+  if isinstance(ground,(int,float)) and math.isfinite(ground):self.station_altitude_ft=ground+self.config.get('camera_height_ft',0)
  def reports(self,now):
   d=self.data;c=self.config;center=d.get('center',{});radius=d.get('radius_nm',0)
   age=now-d.get('sampled_epoch',0)
@@ -23,7 +33,7 @@ class AircraftOverlay:
   return (d.get('aircraft',[]) if valid else []),age,valid
  def render(self,ink,now=None):
   now=time.time() if now is None else now;reports,age,valid=self.reports(now)
-  canvas=Image.new('RGBA',(460,490));draw=ImageDraw.Draw(canvas);cx,cy,r=230,252,182
+  canvas=Image.new('RGBA',(460,820));draw=ImageDraw.Draw(canvas);cx,cy,r=230,252,182
   draw.text((0,0),'Air traffic',font=self.font,fill=ink,anchor='lt')
   azimuth=self.config.get('camera_azimuth_deg')
   oriented=isinstance(azimuth,(int,float)) and not isinstance(azimuth,bool) and math.isfinite(azimuth) and 0<=azimuth<360
@@ -45,7 +55,7 @@ class AircraftOverlay:
     end=min(start+8,r);draw.line((cx+math.sin(angle)*start,cy-math.cos(angle)*start,cx+math.sin(angle)*end,cy-math.cos(angle)*end),fill=ink,width=2)
    draw.text((0,28),f"Camera {azimuth:g}° · {fov['focal_length_mm']:g} mm",font=self.small,fill=ink,anchor='lt')
   radius=self.config.get('radius_nm',15/1.150779448);center=self.config
-  total=0;in_view=0
+  total=0;in_view=0;unknown=0;side_rows=[]
   for a in reports:
    try:
     p1,p2=math.radians(center['latitude']),math.radians(a['latitude']);dl=math.radians(a['longitude']-center['longitude']);dp=p2-p1
@@ -56,16 +66,50 @@ class AircraftOverlay:
     if not all(math.isfinite(v) for v in (distance,bearing)):continue
     total+=1
     delta=math.atan2(math.sin(bearing-heading),math.cos(bearing-heading))
-    if oriented and abs(delta)<=math.radians(fov['azimuth_span_deg']/2):in_view+=1
+    view=aircraft_view(self.config,a,self.station_altitude_ft)
+    if view:
+     if view['in_fov']:in_view+=1
+     if view['in_bearing'] and view['in_fov'] is None:unknown+=1
+     if view['in_bearing'] and view['relative_height_ft'] is not None:side_rows.append(view)
     x=cx+math.sin(bearing-heading)*distance/radius*r;y=cy-math.cos(bearing-heading)*distance/radius*r
     track=a.get('track_deg')
     if isinstance(track,(int,float)) and math.isfinite(track):
      theta=math.radians(track)-heading;points=[(x+px*math.cos(theta)-py*math.sin(theta),y+px*math.sin(theta)+py*math.cos(theta)) for px,py in [(0,-9),(6,6),(0,3),(-6,6)]];draw.polygon(points,fill=ink)
     else:draw.ellipse((x-3,y-3,x+3,y+3),fill=ink)
+    if view and view['in_fov']:draw.rectangle((x-12,y-12,x+12,y+12),outline=ink,width=2)
    except (KeyError,TypeError,ValueError):continue
   draw.text((460,0),f'{total} aircraft' if valid else 'Data unavailable',font=self.small,fill=ink,anchor='rt')
-  if valid and oriented:draw.text((460,28),f'{in_view} in Field of View',font=self.small,fill=ink,anchor='rt')
-  draw.text((0,488),'ADSB.lol · ODbL',font=self.small,fill=ink,anchor='lb');draw.text((460,488),f'{round(radius*1.150779448)} mi radius',font=self.small,fill=ink,anchor='rb')
-  return canvas.resize((230,245),Image.Resampling.LANCZOS)
+  if valid and oriented:
+   label=f'{in_view} in Field of View'+(f' · {unknown} unknown' if unknown else '') if self.station_altitude_ft is not None and fov['elevation_deg'] is not None else 'FoV unavailable'
+   draw.text((460,28),label,font=self.small,fill=ink,anchor='rt')
+  draw.text((0,500),'Side view',font=self.font,fill=ink,anchor='lt')
+  pitch=fov['elevation_deg']
+  detail=f'{pitch:g}° ↑ · {fov["vertical_deg"]:.1f}° FoV' if pitch is not None else 'Set camera elevation'
+  draw.text((460,502),detail,font=self.small,fill=ink,anchor='rt')
+  side=Image.new('RGBA',(460,240));sd=ImageDraw.Draw(side);x0,y0,w,top=40,200,400,20;scale=w/radius
+  # Cone is drawn on a clipped layer so steep elevation never covers headings.
+  cone=Image.new('RGBA',(w,y0-top));cd=ImageDraw.Draw(cone)
+  if pitch is not None:
+   angles=[math.radians(pitch-fov['vertical_deg']/2),math.radians(pitch+fov['vertical_deg']/2)]
+   verts=[(0,y0-top)]+[(math.cos(v)*5000,y0-top-math.sin(v)*5000) for v in angles]
+   cd.polygon(verts,fill=(*ink[:3],30));cd.line(verts+[verts[0]],fill=(*ink[:3],140),width=1)
+   a=math.radians(pitch);cd.line((0,y0-top,math.cos(a)*5000,y0-top-math.sin(a)*5000),fill=(*ink[:3],140),width=1)
+  side.alpha_composite(cone,(x0,top));sd=ImageDraw.Draw(side)
+  for frac in (.5,1):
+   y=y0-(y0-top)*frac;sd.line((x0,y,x0+w,y),fill=ink,width=1);sd.text((x0+4,y-4),f'{round((y0-y)/scale*6076.11549/1000)}k ft',font=self.small,fill=ink,anchor='lb')
+  sd.line((x0,top,x0,y0,x0+w,y0),fill=ink,width=1)
+  sd.text((x0,y0+8),'0',font=self.small,fill=ink,anchor='lt');sd.text((x0+w,y0+8),f'{round(radius*1.150779448)} mi',font=self.small,fill=ink,anchor='rt')
+  for v in side_rows:
+   x=x0+v['distance_nm']*scale;y=y0-v['relative_height_ft']/6076.11549*scale
+   if not top<=y<=y0 or not x0<=x<=x0+w:continue
+   sd.ellipse((x-3,y-3,x+3,y+3),fill=ink)
+   if v['in_fov']:sd.rectangle((x-8,y-8,x+8,y+8),outline=ink,width=2)
+  sd.ellipse((x0-3,y0-3,x0+3,y0+3),fill=ink)
+  note='Awaiting fresh aircraft data' if not valid else 'Station elevation unavailable' if self.station_altitude_ft is None else None
+  if note:sd.text((240,100),note,font=self.small,fill=ink,anchor='mm')
+  canvas.alpha_composite(side,(0,530))
+  draw.text((0,788),'ADSB.lol · ODbL',font=self.small,fill=ink,anchor='lb');draw.text((460,788),f'{round(radius*1.150779448)} mi radius',font=self.small,fill=ink,anchor='rb')
+  if self.terrain_source=='Copernicus / Open-Meteo':draw.text((0,810),'Terrain: Copernicus / Open-Meteo',font=self.small,fill=ink,anchor='lb')
+  return canvas.resize((230,410),Image.Resampling.LANCZOS)
  def draw(self,canvas,ink):
-  self.read();canvas.alpha_composite(self.render(ink),(30,canvas.height-305))
+  self.read();canvas.alpha_composite(self.render(ink),(30,canvas.height-470))
