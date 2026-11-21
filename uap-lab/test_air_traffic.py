@@ -56,6 +56,19 @@ class TrafficTests(unittest.TestCase):
   a.save_settings(self.root,dict(action='add_landmark',address='Stanford Dish'))
   result=a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_azimuth_deg=123.4))
   self.assertEqual(len(result['landmarks']),1);self.assertEqual(result['radius_nm'],a.DEFAULT['radius_nm'])
+ def test_elevation_roundtrip_and_clear(self):
+  for value in [0,45.5,90,-90,None]:
+   result=a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_elevation_deg=value))
+   self.assertEqual(result['camera_elevation_deg'],value);self.assertEqual(a.live(self.root)['camera_elevation_deg'],value)
+ def test_invalid_elevation_is_atomic(self):
+  for value in [-91,91,True,'45',float('nan')]:
+   with self.assertRaises(ValueError):a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_azimuth_deg=90,camera_elevation_deg=value))
+  self.assertEqual(a.settings(self.root),a.DEFAULT)
+ def test_elevation_preserves_other_settings(self):
+  a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_azimuth_deg=180,radius_miles=20))
+  a.save_settings(self.root,dict(action='add_landmark',address='Stanford Dish'))
+  result=a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_elevation_deg=45))
+  self.assertEqual(result['camera_azimuth_deg'],180);self.assertEqual(len(result['landmarks']),1);self.assertAlmostEqual(result['radius_nm']*1.150779448,20)
  def test_ground_excluded(self):self.assertEqual(a.normalize(self.payload(alt_baro='ground'),a.DEFAULT,self.now)['aircraft'],[])
  def test_stale_position_excluded(self):self.assertEqual(a.normalize(self.payload(seen_pos=31),a.DEFAULT,self.now)['aircraft'],[])
  def test_missing_direction_is_not_north(self):

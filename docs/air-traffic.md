@@ -37,3 +37,5 @@ Settings → Radar landmarks accepts an address or landmark and an optional shor
 ## Camera azimuth
 
 Settings → Camera azimuth (° true) accepts a heading clockwise from true north, from 0 through 359.9°. Blank means unknown and hides the marker. No heading is assumed by default. Both station and YouTube radars show a dashed camera bearing and its numeric value. This is a manually entered direction only, not camera field of view, elevation, automatic tracking, or an aircraft-identification match. Changing heading preserves the radar center, radius, and saved landmarks.
+
+Camera elevation (°) stores upward tilt independently: 0° is the horizon, 90° is straight up, and negative angles point below the horizon (minimum −90°). Blank means unknown. This setting does not change the north-up radar's ground-distance projection or imply a calibrated field of view.
