@@ -75,6 +75,16 @@ class TrafficTests(unittest.TestCase):
   self.assertEqual(a.live(self.root)['center']['resolved_address'],config['resolved_address'])
   a.store(self.root,self.snapshot())
   self.assertEqual(a.live(self.root)['center']['resolved_address'],config['resolved_address'])
+ def test_radar_county_is_structured_and_private(self):
+  response={'address':{'county':'San Mateo County','country_code':'us','ISO3166-2-lvl4':'US-CA','road':'SECRET'}}
+  with patch.object(a,'fetch_json',return_value=response):a.refresh_region(self.root)
+  self.assertEqual(a.public_region(self.root),dict(status='known',county='San Mateo County',state='CA',country='US'))
+  self.assertNotIn('SECRET',(a.base(self.root)/'radar-region.json').read_text())
+  with patch.object(a,'fetch_json',side_effect=AssertionError('cached')):a.refresh_region(self.root)
+ def test_moved_radar_does_not_use_old_county(self):
+  a.atomic(a.base(self.root)/'radar-region.json',dict(status='known',center_key=a.region_key(a.DEFAULT),county='Old',state='CA',country='US'))
+  a.atomic(a.base(self.root)/'settings.json',dict(a.DEFAULT,latitude=40))
+  self.assertEqual(a.public_region(self.root)['status'],'unknown')
  def test_ground_excluded(self):self.assertEqual(a.normalize(self.payload(alt_baro='ground'),a.DEFAULT,self.now)['aircraft'],[])
  def test_stale_position_excluded(self):self.assertEqual(a.normalize(self.payload(seen_pos=31),a.DEFAULT,self.now)['aircraft'],[])
  def test_missing_direction_is_not_north(self):

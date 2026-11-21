@@ -196,6 +196,33 @@ def collect_once(root):
     snapshot=normalize(fetch_json(url),config,time.time());store(root,snapshot)
     return snapshot
 
+def region_key(config):
+    return hashlib.sha256(json.dumps([config['latitude'],config['longitude']]).encode()).hexdigest()[:16]
+
+def public_region(root):
+    value=read(base(root)/'radar-region.json',{})
+    if value.get('center_key')!=region_key(settings(root)) or value.get('status')!='known':return dict(status='unknown')
+    return {k:value[k] for k in ('status','county','state','country')}
+
+def refresh_region(root):
+    config=settings(root);key=region_key(config);path=base(root)/'radar-region.json';old=read(path,{})
+    if old.get('center_key')==key and (old.get('status')=='known' or time.time()<old.get('retry_after',0)):return
+    directory=base(root)
+    with (directory/'settings.lock').open('a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        gate=directory/'geocode-last.json'
+        if time.time()-read(gate,{}).get('epoch',0)<2:return
+        atomic(gate,dict(epoch=time.time()))
+        value=dict(status='unknown',center_key=key,retry_after=time.time()+3600)
+        try:
+            response=fetch_json('https://nominatim.openstreetmap.org/reverse?'+urlencode(dict(lat=config['latitude'],lon=config['longitude'],format='jsonv2',zoom=10,addressdetails=1)))
+            address=response.get('address',{});county=address.get('county');country=str(address.get('country_code','')).upper()
+            state=address.get('ISO3166-2-lvl4','').removeprefix(country+'-') or address.get('state')
+            if all(isinstance(v,str) and 0<len(v)<=120 and not any(ord(c)<32 for c in v) for v in (county,state,country)):
+                value.update(status='known',county=county,state=state,country=country)
+        except (OSError,ValueError,TypeError):pass
+        atomic(path,value)
+
 def run(root):
     root=Path(root).resolve()
     if not str(root).startswith('/Volumes/') or not Path('/Volumes',root.parts[2]).is_mount():raise SystemExit('External field storage unavailable')
@@ -220,6 +247,7 @@ def run(root):
             try:
                 from air_traffic_archive import collect_due
                 collect_due(root)
+                refresh_region(root)
             except Exception:
                 pass  # A public provider failure cannot interrupt the private radar.
             time.sleep(POLL)
