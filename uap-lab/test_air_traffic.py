@@ -20,6 +20,30 @@ class TrafficTests(unittest.TestCase):
   for radius in [0,101,'10',True,float('nan')]:
    with self.assertRaises(ValueError):a.save_settings(self.root,{'address':a.DEFAULT['address'],'radius_miles':radius})
   self.assertEqual(a.settings(self.root),a.DEFAULT)
+ def test_landmark_add_remove_preserves_center(self):
+  result=a.save_settings(self.root,dict(action='add_landmark',address='Stanford Dish',label='Dish'))
+  self.assertEqual(result['address'],a.DEFAULT['address']);self.assertEqual(result['landmarks'][0]['label'],'Dish')
+  result=a.save_settings(self.root,dict(action='remove_landmark',id=result['landmarks'][0]['id']))
+  self.assertEqual(result['landmarks'],[])
+ def test_landmark_lookup_and_duplicate(self):
+  with patch.object(a,'fetch_json',return_value=[dict(lat='37.42',lon='-122.18',display_name='Campus')]):
+   result=a.save_settings(self.root,dict(action='add_landmark',address='Campus, Stanford'))
+  self.assertEqual(result['landmarks'][0]['label'],'Campus')
+  with self.assertRaises(ValueError):a.save_settings(self.root,dict(action='add_landmark',address='Campus, Stanford'))
+ def test_failed_landmark_preserves_settings(self):
+  with patch.object(a,'fetch_json',return_value=[]):
+   with self.assertRaises(ValueError):a.save_settings(self.root,dict(action='add_landmark',address='Missing place'))
+  self.assertEqual(a.settings(self.root),a.DEFAULT)
+ def test_landmarks_visible_when_feed_unavailable(self):
+  a.save_settings(self.root,dict(action='add_landmark',address='Stanford Dish'))
+  self.assertEqual(len(a.live(self.root)['landmarks']),1)
+ def test_landmarks_visible_when_feed_stale(self):
+  a.store(self.root,self.snapshot());a.save_settings(self.root,dict(action='add_landmark',address='Stanford Dish'))
+  result=a.live(self.root,self.now+40);self.assertEqual(result['status'],'stale');self.assertEqual(len(result['landmarks']),1)
+ def test_center_save_preserves_landmarks(self):
+  a.save_settings(self.root,dict(action='add_landmark',address='Stanford Dish'))
+  result=a.save_settings(self.root,dict(address=a.DEFAULT['address'],radius_miles=20))
+  self.assertEqual(len(result['landmarks']),1)
  def test_ground_excluded(self):self.assertEqual(a.normalize(self.payload(alt_baro='ground'),a.DEFAULT,self.now)['aircraft'],[])
  def test_stale_position_excluded(self):self.assertEqual(a.normalize(self.payload(seen_pos=31),a.DEFAULT,self.now)['aircraft'],[])
  def test_missing_direction_is_not_north(self):

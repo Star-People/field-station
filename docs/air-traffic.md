@@ -29,3 +29,7 @@ Automatic and manual Internet Archive bundles include `air-traffic.json`, with O
 The Archive planner includes this file in its checksummed inventory and rebuilds that inventory when aircraft evidence changes. Previously collected public samples survive rolling-history expiry. Historical recordings without contemporaneous aircraft data explicitly report unavailable; today's aircraft are never substituted. Manual recordings reviewed after history expiry can lack context if no bundle was prepared while history was retained.
 
 Reload the capture/publisher and recognition services after installing the integration. The collector starts at login and restarts automatically.
+
+## Radar landmarks
+
+Settings → Radar landmarks accepts an address or landmark and an optional short name. Add resolves the address once and saves a private marker; Remove deletes it. Up to 20 markers are supported. Markers use the same adaptive color as the radar, show as labeled diamonds, and remain visible during aircraft-feed delays. Only markers within the configured radius are plotted. Hover or tap a marker for its full name and address. Landmarks do not move the radar center, alter classification, or enter Internet Archive bundles/public snapshots.

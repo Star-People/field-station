@@ -8,7 +8,7 @@
   const r=await fetch(path,{method:body?'POST':'GET',headers:{'X-Lab-Token':token,...(body?{'Content-Type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{}),cache:'no-store',signal:AbortSignal.timeout(12000)});
   if(r.status===403){token='';throw Error('Reconnecting to station');}const v=await r.json();if(!r.ok)throw Error(v.error||'Air traffic unavailable');return v;
  }
- const css=document.createElement('link');css.rel='stylesheet';css.href='/air-traffic.css?v=1';document.head.append(css);
+ const css=document.createElement('link');css.rel='stylesheet';css.href='/air-traffic.css?v=2';document.head.append(css);
  const settings=document.querySelector('#stationSettings');
  if(settings){
   const area=document.createElement('div');area.className='air-traffic-settings';
@@ -16,9 +16,17 @@
   settings.insertBefore(area,settings.querySelector('#stationLocation'));
   const input=area.querySelector('#radarAddress'),radius=area.querySelector('#radarRadius'),button=area.querySelector('button'),status=area.querySelector('p');let dirty=false,busy=false;
   for(const control of [input,radius])control.addEventListener('input',()=>{dirty=true;status.textContent='';});
-  async function load(){if(dirty||busy)return;try{const s=await api('/api/air-traffic/settings');input.value=s.address;radius.value=Math.round(s.radius_nm*1.150779448);}catch(e){status.textContent=e.message;}}
+  async function load(){if(dirty||busy)return;try{const s=await api('/api/air-traffic/settings');input.value=s.address;radius.value=Math.round(s.radius_nm*1.150779448);renderLandmarks(s.landmarks);}catch(e){status.textContent=e.message;}}
   document.querySelector('#stationSettingsOpen')?.addEventListener('click',load);
-  async function save(){if(busy)return;busy=true;button.disabled=true;input.disabled=true;radius.disabled=true;status.textContent='Saving radar settings…';try{const s=await api('/api/air-traffic/settings',{address:input.value,radius_miles:Number(radius.value)});input.value=s.address;radius.value=Math.round(s.radius_nm*1.150779448);dirty=false;status.textContent='Saved · '+(s.resolved_address||s.address);window.dispatchEvent(new Event('radar-center-changed'));}catch(e){status.textContent=e.message;}finally{busy=false;button.disabled=false;input.disabled=false;radius.disabled=false;}}
+  async function save(){if(busy)return;busy=true;button.disabled=true;input.disabled=true;radius.disabled=true;status.textContent='Saving radar settings…';try{const s=await api('/api/air-traffic/settings',{address:input.value,radius_miles:Number(radius.value)});input.value=s.address;radius.value=Math.round(s.radius_nm*1.150779448);renderLandmarks(s.landmarks);dirty=false;status.textContent='Saved · '+(s.resolved_address||s.address);window.dispatchEvent(new Event('radar-center-changed'));}catch(e){status.textContent=e.message;}finally{busy=false;button.disabled=false;input.disabled=false;radius.disabled=false;}}
+  const landmarks=document.createElement('div');landmarks.className='radar-landmark-settings';
+  landmarks.innerHTML='<label for="radarLandmarkAddress">Radar landmarks</label><input id="radarLandmarkName" aria-label="Landmark name (optional)" maxlength="60" placeholder="Name (optional)"><div class="radar-address-row"><input id="radarLandmarkAddress" maxlength="250" placeholder="Address or landmark" autocomplete="off"><button type="button" id="radarLandmarkAdd">Add</button></div><p role="status" id="radarLandmarkStatus"></p><ul class="radar-landmark-list"></ul>';
+  area.append(landmarks);
+  const landmarkName=landmarks.querySelector('#radarLandmarkName'),landmarkAddress=landmarks.querySelector('#radarLandmarkAddress'),landmarkAdd=landmarks.querySelector('#radarLandmarkAdd'),landmarkStatus=landmarks.querySelector('#radarLandmarkStatus'),list=landmarks.querySelector('ul');let landmarkBusy=false;
+  function renderLandmarks(items){list.replaceChildren();for(const item of items||[]){const row=document.createElement('li'),text=document.createElement('span'),remove=document.createElement('button');text.textContent=item.label;text.title=item.address;remove.type='button';remove.textContent='Remove';remove.setAttribute('aria-label','Remove '+item.label);remove.disabled=landmarkBusy;remove.addEventListener('click',()=>changeLandmark({action:'remove_landmark',id:item.id}));row.append(text,remove);list.append(row);}}
+  async function changeLandmark(body){if(landmarkBusy)return;landmarkBusy=true;landmarkAdd.disabled=true;list.querySelectorAll('button').forEach(b=>b.disabled=true);landmarkStatus.textContent=body.action==='add_landmark'?'Finding landmark…':'Removing…';try{const config=await api('/api/air-traffic/settings',body);if(body.action==='add_landmark'){landmarkName.value='';landmarkAddress.value='';}renderLandmarks(config.landmarks);landmarkStatus.textContent='Saved';window.dispatchEvent(new Event('radar-center-changed'));}catch(e){landmarkStatus.textContent=e.message;}finally{landmarkBusy=false;landmarkAdd.disabled=false;list.querySelectorAll('button').forEach(b=>b.disabled=false);}}
+  landmarkAdd.addEventListener('click',()=>changeLandmark({action:'add_landmark',address:landmarkAddress.value,label:landmarkName.value}));
+  for(const control of [landmarkName,landmarkAddress])control.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();landmarkAdd.click();}});
   button.addEventListener('click',save);input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save();}});
  }
  const viewer=document.querySelector('#liveViewer');
@@ -44,6 +52,13 @@
    for(const [label,x,y] of [['N',cx,26],['E',502,cy+6],['S',cx,508],['W',18,cy+6]])ctx.fillText(label,x,y);
    ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
    const range=latest?.radius_nm||(15/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi',464,468);
+   if(latest?.center){
+    const labels=[];ctx.font=(canvas.clientWidth<180?'25':'18')+'px "IBM Plex Mono", monospace';
+    for(const landmark of latest.landmarks||[]){const p=position(landmark,latest.center);if(p.distance>range)continue;const x=cx+Math.sin(p.bearing)*p.distance/range*r,y=cy-Math.cos(p.bearing)*p.distance/range*r;
+     ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.strokeRect(-5,-5,10,10);ctx.restore();points.push({x,y,landmark});
+     const label=landmark.label.length>18?landmark.label.slice(0,17)+'…':landmark.label;ctx.textAlign=x>cx?'right':'left';const lx=x+(x>cx?-12:12);let ly=y-12;while(labels.some(v=>Math.abs(v.y-ly)<26&&Math.abs(v.x-lx)<160))ly+=26;if(ly<475){ctx.fillText(label,lx,ly);labels.push({x:lx,y:ly});}
+    }
+   }
    if(latest?.status!=='available')return;
    const now=Date.now()/1000;
    for(const a of latest.aircraft||[]){
@@ -55,7 +70,7 @@
     ctx.fill();ctx.restore();
    }
   }
-  function showAt(event){const rect=canvas.getBoundingClientRect(),x=(event.clientX-rect.left)*520/rect.width,y=(event.clientY-rect.top)*520/rect.height;let hit=null,d=28;for(const p of points){const n=Math.hypot(p.x-x,p.y-y);if(n<d){hit=p;d=n;}}if(!hit){tip.hidden=true;return;}const a=hit.a;tip.textContent=[a.flight||a.r||a.hex,a.t,Number.isFinite(a.altitude_ft)?Math.round(a.altitude_ft).toLocaleString()+' ft':null,Number.isFinite(a.speed_knots)?Math.round(a.speed_knots)+' kt':null,Number.isFinite(a.track_deg)?Math.round(a.track_deg)+'° track':null].filter(Boolean).join(' · ');tip.hidden=false;}
+  function showAt(event){const rect=canvas.getBoundingClientRect(),x=(event.clientX-rect.left)*520/rect.width,y=(event.clientY-rect.top)*520/rect.height;let hit=null,d=28;for(const p of points){const n=Math.hypot(p.x-x,p.y-y);if(n<d){hit=p;d=n;}}if(!hit){tip.hidden=true;return;}if(hit.landmark){tip.textContent=hit.landmark.label+' · '+hit.landmark.address;tip.hidden=false;return;}const a=hit.a;tip.textContent=[a.flight||a.r||a.hex,a.t,Number.isFinite(a.altitude_ft)?Math.round(a.altitude_ft).toLocaleString()+' ft':null,Number.isFinite(a.speed_knots)?Math.round(a.speed_knots)+' kt':null,Number.isFinite(a.track_deg)?Math.round(a.track_deg)+'° track':null].filter(Boolean).join(' · ');tip.hidden=false;}
   canvas.addEventListener('pointermove',showAt);canvas.addEventListener('click',showAt);canvas.addEventListener('pointerleave',()=>tip.hidden=true);
   async function refresh(){clearTimeout(timer);if(busy)return;busy=true;try{latest=await api('/api/air-traffic');state.textContent=latest.status==='available'?(latest.aircraft.length+' aircraft'):latest.status==='stale'?'Feed delayed':latest.status==='waiting'?'Updating center…':'Unavailable';center.textContent=(latest.center?.address||'').split(',')[0];center.title=latest.center?.address||'';canvas.setAttribute('aria-label',`North-up aircraft radar. ${state.textContent}. Arrows show reported ground track.`);}catch(e){latest=null;state.textContent='Unavailable';}finally{busy=false;draw();timer=setTimeout(refresh,15000);}}
   window.addEventListener('radar-center-changed',()=>{latest=null;draw();refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});ink();refresh();setInterval(draw,5000);

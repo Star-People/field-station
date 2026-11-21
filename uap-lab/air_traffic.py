@@ -38,7 +38,23 @@ def fetch_json(url):
         if len(raw)>2*1024*1024:raise ValueError('Response too large')
         return json.loads(raw)
 
+def resolve_address(root,address):
+    directory=base(root)
+    if address.casefold() in ('stanford dish','the stanford dish',DEFAULT['address'].casefold()):
+        lat,lon=DEFAULT['latitude'],DEFAULT['longitude'];resolved=DEFAULT['address']
+    else:
+        # Submit-only geocoding: no autocomplete or keystroke requests.
+        gate=directory/'geocode-last.json';last=read(gate,{})
+        if time.time()-last.get('epoch',0)<2:raise ValueError('Please wait a moment before resolving another address.')
+        atomic(gate,{'epoch':time.time()})
+        results=fetch_json('https://nominatim.openstreetmap.org/search?'+urlencode(dict(q=address,format='jsonv2',limit=1)))
+        if not isinstance(results,list) or not results:raise ValueError('Address not found. Include the city and state.')
+        lat,lon=float(results[0]['lat']),float(results[0]['lon']);resolved=str(results[0]['display_name'])[:500]
+        if not -90<=lat<=90 or not -180<=lon<=180:raise ValueError('Invalid location result.')
+    return lat,lon,resolved
+
 def save_settings(root, value):
+    if value.get('action') in ('add_landmark','remove_landmark'):return update_landmark(root,value)
     address=value.get('address')
     if not isinstance(address,str) or not 3<=len(address.strip())<=250 or any(ord(c)<32 for c in address):
         raise ValueError('Enter an address or landmark.')
@@ -52,18 +68,28 @@ def save_settings(root, value):
         if address==config['address']:
             config['updated_epoch']=time.time();atomic(directory/'settings.json',config)
             return config
-        if address.casefold() in ('stanford dish','the stanford dish',DEFAULT['address'].casefold()):
-            lat,lon=DEFAULT['latitude'],DEFAULT['longitude'];resolved=DEFAULT['address']
-        else:
-            # Submit-only geocoding: no autocomplete or keystroke requests.
-            gate=directory/'geocode-last.json';last=read(gate,{})
-            if time.time()-last.get('epoch',0)<2:raise ValueError('Please wait a moment before resolving another address.')
-            atomic(gate,{'epoch':time.time()})
-            results=fetch_json('https://nominatim.openstreetmap.org/search?'+urlencode(dict(q=address,format='jsonv2',limit=1)))
-            if not isinstance(results,list) or not results:raise ValueError('Address not found. Include the city and state.')
-            lat,lon=float(results[0]['lat']),float(results[0]['lon']);resolved=str(results[0]['display_name'])[:500]
-            if not -90<=lat<=90 or not -180<=lon<=180:raise ValueError('Invalid location result.')
+        lat,lon,resolved=resolve_address(root,address)
         config.update(address=address,latitude=lat,longitude=lon,resolved_address=resolved,updated_epoch=time.time())
+        atomic(directory/'settings.json',config)
+        return config
+
+def update_landmark(root,value):
+    directory=base(root);directory.mkdir(parents=True,exist_ok=True)
+    with (directory/'settings.lock').open('a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        config=settings(root);items=list(config.get('landmarks',[]))
+        if value['action']=='remove_landmark':
+            items=[r for r in items if r['id']!=value.get('id')]
+        else:
+            address=value.get('address');label=value.get('label','')
+            if not isinstance(address,str) or not 3<=len(address.strip())<=250 or any(ord(c)<32 for c in address):raise ValueError('Enter a landmark address.')
+            if not isinstance(label,str) or len(label)>60 or any(ord(c)<32 for c in label):raise ValueError('Use a landmark name of up to 60 characters.')
+            address=address.strip();label=label.strip() or address.split(',')[0][:60]
+            if any(r['address'].casefold()==address.casefold() for r in items):raise ValueError('This landmark is already saved.')
+            if len(items)>=20:raise ValueError('You can save up to 20 landmarks.')
+            lat,lon,resolved=resolve_address(root,address)
+            items.append(dict(id=uuid.uuid4().hex,label=label,address=address,resolved_address=resolved,latitude=lat,longitude=lon))
+        config['landmarks']=items;config['updated_epoch']=time.time()
         atomic(directory/'settings.json',config)
         return config
 
@@ -122,7 +148,8 @@ def live(root, now=None):
     now=time.time() if now is None else now
     result=read(base(root)/'latest.json',{'status':'unavailable','aircraft':[]})
     config=settings(root)
-    if result.get('center_id')!=center_id(config):return dict(status='waiting',aircraft=[],center=dict(address=config['address'],latitude=config['latitude'],longitude=config['longitude']),radius_nm=config['radius_nm'])
+    if result.get('center_id')!=center_id(config):return dict(status='waiting',aircraft=[],center=dict(address=config['address'],latitude=config['latitude'],longitude=config['longitude']),radius_nm=config['radius_nm'],landmarks=config.get('landmarks',[]))
+    result['landmarks']=config.get('landmarks',[])
     result['age_seconds']=round(max(0,now-result.get('sampled_epoch',0)),1)
     if result['age_seconds']>MAX_AGE:result.update(status='stale',aircraft=[])
     else:result['aircraft']=[a for a in result.get('aircraft',[]) if 0<=now-a['position_epoch']<=MAX_AGE]
