@@ -12,7 +12,7 @@
  const settings=document.querySelector('#stationSettings');
  if(settings){
   const area=document.createElement('div');area.className='air-traffic-settings';
-  area.innerHTML='<label for="radarAddress">Radar center address</label><div class="radar-address-row"><input id="radarAddress" type="text" autocomplete="off" maxlength="250" placeholder="Address or landmark"></div><label for="radarRadius">Radar radius (miles)</label><div class="radar-address-row"><input id="radarRadius" type="number" min="1" max="100" step="1" value="10"><button id="radarAddressSave" type="button">Save</button></div><p id="radarAddressStatus" role="status"></p>';
+  area.innerHTML='<label for="radarAddress">Radar center address</label><div class="radar-address-row"><input id="radarAddress" type="text" autocomplete="off" maxlength="250" placeholder="Address or landmark"></div><label for="radarRadius">Radar radius (miles)</label><div class="radar-address-row"><input id="radarRadius" type="number" min="1" max="100" step="1" value="15"><button id="radarAddressSave" type="button">Save</button></div><p id="radarAddressStatus" role="status"></p>';
   settings.insertBefore(area,settings.querySelector('#stationLocation'));
   const input=area.querySelector('#radarAddress'),radius=area.querySelector('#radarRadius'),button=area.querySelector('button'),status=area.querySelector('p');let dirty=false,busy=false;
   for(const control of [input,radius])control.addEventListener('input',()=>{dirty=true;status.textContent='';});
@@ -43,7 +43,7 @@
    ctx.globalAlpha=.24;ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.moveTo(cx,cy-r);ctx.lineTo(cx,cy+r);ctx.stroke();ctx.globalAlpha=1;
    for(const [label,x,y] of [['N',cx,26],['E',502,cy+6],['S',cx,508],['W',18,cy+6]])ctx.fillText(label,x,y);
    ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
-   const range=latest?.radius_nm||(10/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi',464,468);
+   const range=latest?.radius_nm||(15/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi',464,468);
    if(latest?.status!=='available')return;
    const now=Date.now()/1000;
    for(const a of latest.aircraft||[]){

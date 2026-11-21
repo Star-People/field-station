@@ -11,7 +11,7 @@ class TrafficTests(unittest.TestCase):
   row=dict(hex='abc123',flight='UAL123 ',lat=37.4,lon=-122.18,alt_baro=10000,gs=200,track=0,seen_pos=1);row.update(kw)
   return dict(now=self.now*1000,ac=[row])
  def snapshot(self):return a.normalize(self.payload(),a.DEFAULT,self.now)
- def test_outside_ten_miles_excluded(self):self.assertEqual(a.normalize(self.payload(lat=37.7),a.DEFAULT,self.now)['aircraft'],[])
+ def test_outside_default_radius_excluded(self):self.assertEqual(a.normalize(self.payload(lat=37.7),a.DEFAULT,self.now)['aircraft'],[])
  def test_radius_only_update_needs_no_geocoding(self):
   with patch.object(a,'fetch_json',side_effect=AssertionError('network')):
    result=a.save_settings(self.root,{'address':a.DEFAULT['address'],'radius_miles':25})

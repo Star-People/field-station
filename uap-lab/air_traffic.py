@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError
 
 DEFAULT = dict(address='Stanford Dish, Stanford, CA', latitude=37.4083, longitude=-122.179,
-               radius_nm=10 / 1.150779448, enabled=True)
+               radius_nm=15 / 1.150779448, enabled=True)
 PROVIDER='adsb.fi'
 PROVIDER_URL='https://adsb.fi/'
 MAX_AGE=30
