@@ -44,6 +44,18 @@ class TrafficTests(unittest.TestCase):
   a.save_settings(self.root,dict(action='add_landmark',address='Stanford Dish'))
   result=a.save_settings(self.root,dict(address=a.DEFAULT['address'],radius_miles=20))
   self.assertEqual(len(result['landmarks']),1)
+ def test_azimuth_zero_is_north_and_can_clear(self):
+  result=a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_azimuth_deg=0))
+  self.assertEqual(result['camera_azimuth_deg'],0);self.assertEqual(a.live(self.root)['camera_azimuth_deg'],0)
+  result=a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_azimuth_deg=None));self.assertIsNone(result['camera_azimuth_deg'])
+ def test_invalid_azimuth_cannot_change_settings(self):
+  for azimuth in [-1,360,'90',True,float('nan')]:
+   with self.assertRaises(ValueError):a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_azimuth_deg=azimuth))
+  self.assertEqual(a.settings(self.root),a.DEFAULT)
+ def test_azimuth_update_preserves_landmarks_and_radius(self):
+  a.save_settings(self.root,dict(action='add_landmark',address='Stanford Dish'))
+  result=a.save_settings(self.root,dict(address=a.DEFAULT['address'],camera_azimuth_deg=123.4))
+  self.assertEqual(len(result['landmarks']),1);self.assertEqual(result['radius_nm'],a.DEFAULT['radius_nm'])
  def test_ground_excluded(self):self.assertEqual(a.normalize(self.payload(alt_baro='ground'),a.DEFAULT,self.now)['aircraft'],[])
  def test_stale_position_excluded(self):self.assertEqual(a.normalize(self.payload(seen_pos=31),a.DEFAULT,self.now)['aircraft'],[])
  def test_missing_direction_is_not_north(self):

@@ -29,6 +29,12 @@ class AircraftOverlay:
   draw.line((cx-r,cy,cx+r,cy),fill=faint,width=1);draw.line((cx,cy-r,cx,cy+r),fill=faint,width=1)
   for label,x,y in [('N',cx,42),('E',442,cy),('S',cx,454),('W',18,cy)]:draw.text((x,y),label,font=self.small,fill=ink,anchor='mm')
   draw.ellipse((cx-3,cy-3,cx+3,cy+3),fill=ink)
+  azimuth=self.config.get('camera_azimuth_deg')
+  if isinstance(azimuth,(int,float)) and not isinstance(azimuth,bool) and math.isfinite(azimuth) and 0<=azimuth<360:
+   angle=math.radians(azimuth)
+   for start in range(0,r,15):
+    end=min(start+8,r);draw.line((cx+math.sin(angle)*start,cy-math.cos(angle)*start,cx+math.sin(angle)*end,cy-math.cos(angle)*end),fill=ink,width=2)
+   draw.text((0,28),f'Camera {azimuth:g}°',font=self.small,fill=ink)
   radius=self.config.get('radius_nm',15/1.150779448);center=self.config
   for a in reports:
    try:

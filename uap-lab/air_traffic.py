@@ -64,6 +64,9 @@ def save_settings(root, value):
         config=settings(root)
         radius=value.get('radius_miles',config['radius_nm']*1.150779448)
         if not number(radius) or not 1<=radius<=100:raise ValueError('Radar radius must be between 1 and 100 miles.')
+        azimuth=value.get('camera_azimuth_deg',config.get('camera_azimuth_deg'))
+        if azimuth is not None and (not number(azimuth) or not 0<=azimuth<360):raise ValueError('Camera azimuth must be 0–359.9° clockwise from true north, or blank.')
+        config['camera_azimuth_deg']=azimuth
         config['radius_nm']=radius/1.150779448
         if address==config['address']:
             config['updated_epoch']=time.time();atomic(directory/'settings.json',config)
@@ -148,8 +151,9 @@ def live(root, now=None):
     now=time.time() if now is None else now
     result=read(base(root)/'latest.json',{'status':'unavailable','aircraft':[]})
     config=settings(root)
-    if result.get('center_id')!=center_id(config):return dict(status='waiting',aircraft=[],center=dict(address=config['address'],latitude=config['latitude'],longitude=config['longitude']),radius_nm=config['radius_nm'],landmarks=config.get('landmarks',[]))
+    if result.get('center_id')!=center_id(config):return dict(status='waiting',aircraft=[],center=dict(address=config['address'],latitude=config['latitude'],longitude=config['longitude']),radius_nm=config['radius_nm'],landmarks=config.get('landmarks',[]),camera_azimuth_deg=config.get('camera_azimuth_deg'))
     result['landmarks']=config.get('landmarks',[])
+    result['camera_azimuth_deg']=config.get('camera_azimuth_deg')
     result['age_seconds']=round(max(0,now-result.get('sampled_epoch',0)),1)
     if result['age_seconds']>MAX_AGE:result.update(status='stale',aircraft=[])
     else:result['aircraft']=[a for a in result.get('aircraft',[]) if 0<=now-a['position_epoch']<=MAX_AGE]

@@ -33,3 +33,7 @@ Reload the capture/publisher and recognition services after installing the integ
 ## Radar landmarks
 
 Settings → Radar landmarks accepts an address or landmark and an optional short name. Add resolves the address once and saves a private marker; Remove deletes it. Up to 20 markers are supported. Markers use the same adaptive color as the radar, show as labeled diamonds, and remain visible during aircraft-feed delays. Only markers within the configured radius are plotted. Hover or tap a marker for its full name and address. Landmarks do not move the radar center, alter classification, or enter Internet Archive bundles/public snapshots.
+
+## Camera azimuth
+
+Settings → Camera azimuth (° true) accepts a heading clockwise from true north, from 0 through 359.9°. Blank means unknown and hides the marker. No heading is assumed by default. Both station and YouTube radars show a dashed camera bearing and its numeric value. This is a manually entered direction only, not camera field of view, elevation, automatic tracking, or an aircraft-identification match. Changing heading preserves the radar center, radius, and saved landmarks.

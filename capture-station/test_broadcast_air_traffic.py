@@ -15,6 +15,9 @@ class AircraftOverlayTests(unittest.TestCase):
   self.overlay.config['landmarks']=[dict(label='SECRET HOME',address='PRIVATE ADDRESS',latitude=37.41,longitude=-122.17)]
   self.overlay.config['address']='PRIVATE ADDRESS';self.overlay.data['landmarks']=self.overlay.config['landmarks']
   self.assertEqual(before,self.overlay.render((255,255,255,255),1010).tobytes())
+ def test_camera_azimuth_changes_render(self):
+  before=self.overlay.render((255,255,255,255),1010).tobytes();self.overlay.config['camera_azimuth_deg']=90
+  self.assertNotEqual(before,self.overlay.render((255,255,255,255),1010).tobytes())
  def test_aircraft_render_changes_pixels(self):
   before=self.overlay.render((255,255,255,255),1010).tobytes();self.overlay.data['aircraft']=[]
   self.assertNotEqual(before,self.overlay.render((255,255,255,255),1010).tobytes())
