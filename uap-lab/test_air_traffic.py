@@ -11,6 +11,31 @@ class TrafficTests(unittest.TestCase):
   row=dict(hex='abc123',flight='UAL123 ',lat=37.4,lon=-122.18,alt_baro=10000,gs=200,track=0,seen_pos=1);row.update(kw)
   return dict(now=self.now*1000,ac=[row])
  def snapshot(self):return a.normalize(self.payload(),a.DEFAULT,self.now)
+ def test_poll_cadence_and_single_auxiliary_worker(self):
+  clock=[0.0];attempts=[]
+  class Stop(Exception):pass
+  def collect(root):attempts.append(clock[0]);clock[0]+=4;return {'aircraft':[]}
+  def sleep(seconds):
+   clock[0]+=seconds
+   if len(attempts)>=3:raise Stop()
+  with patch.object(a.time,'monotonic',side_effect=lambda:clock[0]),patch.object(a.time,'sleep',side_effect=sleep),patch.object(a,'collect_once',side_effect=collect),patch.object(a,'ThreadPoolExecutor') as executor:
+   executor.return_value.__enter__.return_value.submit.return_value.done.return_value=False
+   with self.assertRaises(Stop):a.poll(self.root)
+   self.assertEqual(attempts,[0,15,30])
+   self.assertEqual(executor.return_value.__enter__.return_value.submit.call_count,1)
+ def test_poll_preserves_rate_limit_backoff(self):
+  clock=[0.0];attempts=[]
+  class Stop(Exception):pass
+  def collect(root):
+   attempts.append(clock[0])
+   if len(attempts)==1:raise a.HTTPError('test',429,'rate limited',{'Retry-After':'60'},None)
+   return {'aircraft':[]}
+  def sleep(seconds):
+   clock[0]+=seconds
+   if len(attempts)>=2:raise Stop()
+  with patch.object(a.time,'monotonic',side_effect=lambda:clock[0]),patch.object(a.time,'sleep',side_effect=sleep),patch.object(a,'collect_once',side_effect=collect),patch.object(a,'ThreadPoolExecutor'):
+   with self.assertRaises(Stop):a.poll(self.root)
+  self.assertEqual(attempts,[0,60])
  def test_outside_default_radius_excluded(self):self.assertEqual(a.normalize(self.payload(lat=37.7),a.DEFAULT,self.now)['aircraft'],[])
  def test_radius_only_update_needs_no_geocoding(self):
   with patch.object(a,'fetch_json',side_effect=AssertionError('network')):

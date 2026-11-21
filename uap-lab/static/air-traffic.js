@@ -34,7 +34,7 @@
   const panel=document.createElement('section');panel.className='air-radar';panel.setAttribute('aria-label','Nearby aircraft');
   panel.innerHTML='<div class="air-radar-heading"><span>Air traffic</span><span class="air-radar-state" role="status">Connecting…</span></div><div class="air-radar-stage"><canvas width="520" height="520" role="img" aria-label="North-up aircraft radar with direction-of-travel arrows"></canvas><div class="air-radar-tip" hidden></div></div><div class="air-radar-footer"><span class="air-radar-center"></span><a href="https://adsb.fi/" target="_blank" rel="noopener noreferrer">adsb.fi ↗</a></div>';
   viewer.append(panel);
-  const canvas=panel.querySelector('canvas'),ctx=canvas.getContext('2d'),state=panel.querySelector('.air-radar-state'),center=panel.querySelector('.air-radar-center'),tip=panel.querySelector('.air-radar-tip');let latest=null,points=[],busy=false,timer;
+  const canvas=panel.querySelector('canvas'),ctx=canvas.getContext('2d'),state=panel.querySelector('.air-radar-state'),center=panel.querySelector('.air-radar-center'),tip=panel.querySelector('.air-radar-tip');let latest=null,points=[],busy=false,timer,requestFailed=false;
   const rf=document.querySelector('#rfOverlay');
   function ink(){panel.style.color=rf?.style.color||'#fff';draw();}
   if(rf)new MutationObserver(ink).observe(rf,{attributes:true,attributeFilter:['style']});
@@ -76,9 +76,9 @@
     }
    }
    if(latest?.status!=='available')return;
-   const now=Date.now()/1000;
+   const now=Date.now()/1000;const fresh=(latest.aircraft||[]).filter(a=>now-a.position_epoch>=0&&now-a.position_epoch<=30);state.textContent=requestFailed?'Reconnecting…':now-latest.sampled_epoch>30?'Feed delayed':fresh.length+' aircraft';
    for(const a of latest.aircraft||[]){
-    if(now-a.position_epoch>30)continue;
+    if(now-a.position_epoch>30||now<a.position_epoch)continue;
     const p=position(a,latest.center);if(p.distance>range)continue;
     const x=cx+Math.sin(p.bearing-heading)*p.distance/range*r,y=cy-Math.cos(p.bearing-heading)*p.distance/range*r;points.push({x,y,a});
     ctx.save();ctx.translate(x,y);if(canvas.clientWidth<180)ctx.scale(1.5,1.5);ctx.beginPath();
@@ -88,8 +88,8 @@
   }
   function showAt(event){const rect=canvas.getBoundingClientRect(),x=(event.clientX-rect.left)*520/rect.width,y=(event.clientY-rect.top)*520/rect.height;let hit=null,d=28;for(const p of points){const n=Math.hypot(p.x-x,p.y-y);if(n<d){hit=p;d=n;}}if(!hit){tip.hidden=true;return;}if(hit.landmark){tip.textContent=hit.landmark.label+' · '+hit.landmark.address;tip.hidden=false;return;}const a=hit.a;tip.textContent=[a.flight||a.r||a.hex,a.t,Number.isFinite(a.altitude_ft)?Math.round(a.altitude_ft).toLocaleString()+' ft':null,Number.isFinite(a.speed_knots)?Math.round(a.speed_knots)+' kt':null,Number.isFinite(a.track_deg)?Math.round(a.track_deg)+'° track':null].filter(Boolean).join(' · ');tip.hidden=false;}
   canvas.addEventListener('pointermove',showAt);canvas.addEventListener('click',showAt);canvas.addEventListener('pointerleave',()=>tip.hidden=true);
-  async function refresh(){clearTimeout(timer);if(busy)return;busy=true;try{latest=await api('/api/air-traffic');state.textContent=latest.status==='available'?(latest.aircraft.length+' aircraft'):latest.status==='stale'?'Feed delayed':latest.status==='waiting'?'Updating center…':'Unavailable';center.textContent=latest.center?.resolved_address||latest.center?.address||'';center.title=center.textContent;canvas.setAttribute('aria-label',`${Number.isFinite(latest.camera_azimuth_deg)?'Camera-up':'North-up'} aircraft radar. ${state.textContent}. Arrows show reported ground track.`);}catch(e){latest=null;state.textContent='Unavailable';}finally{busy=false;draw();timer=setTimeout(refresh,15000);}}
-  window.addEventListener('radar-center-changed',()=>{latest=null;draw();refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});ink();refresh();setInterval(draw,5000);
+  async function refresh(){clearTimeout(timer);if(busy)return;busy=true;try{latest=await api('/api/air-traffic');requestFailed=false;state.textContent=latest.status==='available'?(latest.aircraft.length+' aircraft'):latest.status==='stale'?'Feed delayed':latest.status==='waiting'?'Updating center…':'Unavailable';center.textContent=latest.center?.resolved_address||latest.center?.address||'';center.title=center.textContent;canvas.setAttribute('aria-label',`${Number.isFinite(latest.camera_azimuth_deg)?'Camera-up':'North-up'} aircraft radar. ${state.textContent}. Arrows show reported ground track.`);}catch(e){requestFailed=true;state.textContent='Reconnecting…';}finally{busy=false;draw();timer=setTimeout(refresh,requestFailed?2500:5000);}}
+  window.addEventListener('radar-center-changed',()=>{latest=null;draw();refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});ink();refresh();setInterval(draw,1000);
  }
  const key=new URLSearchParams(location.search).get('id');
  if(key&&document.querySelector('#video')&&!viewer){

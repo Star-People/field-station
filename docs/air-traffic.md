@@ -6,6 +6,8 @@ Settings → Radar center address defaults to the Stanford Dish (37.4083, -122.1
 
 The collector polls https://opendata.adsb.fi/api/v3/lat/{lat}/lon/{lon}/dist/{distance} every 15 seconds, with exponential error backoff, Retry-After handling, and an hour pause for rejected configuration/authentication. See https://github.com/adsbfi/opendata for provider terms and limits. Data is attributed to adsb.fi and is for private, non-commercial analysis. This private feed is not added to Internet Archive or public snapshots. Nominatim policy: https://operations.osmfoundation.org/policies/nominatim/.
 
+Private collection runs on a monotonic 15-second schedule; public archive collection and county resolution run in a separate, bounded worker. The browser checks the local endpoint every 5 seconds and retries failed requests after 2.5 seconds, retaining only still-fresh positions during retries.
+
 Aircraft positions older than 30 seconds and known ground traffic are excluded. Feed timestamps are validated. Stale/unavailable data is explicitly shown and does not leave stale arrows on screen. Zero reports is not evidence that the airspace is empty: coverage depends on transponders and receiving stations. No automatic classification or training-label changes are made.
 
 On detection creation, a bounded local database read records the latest preceding traffic sample within 30 seconds in `air-traffic.private.json`, next to that detection's event file. Review video → Air traffic at detection time shows that retained context. Historical detections without contemporaneous samples remain unavailable; current traffic is never substituted. This is regional context, not a geometrical match to the camera's field of view.

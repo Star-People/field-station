@@ -1,6 +1,7 @@
 """Private ADS-B context. No automatic visual identification or public redistribution."""
 import argparse, contextlib, fcntl, hashlib, json, math, os, sqlite3, time, uuid, zlib
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 from urllib.error import HTTPError
@@ -223,15 +224,21 @@ def refresh_region(root):
         except (OSError,ValueError,TypeError):pass
         atomic(path,value)
 
-def run(root):
-    root=Path(root).resolve()
-    if not str(root).startswith('/Volumes/') or not Path('/Volumes',root.parts[2]).is_mount():raise SystemExit('External field storage unavailable')
-    base(root).mkdir(parents=True,exist_ok=True)
-    with (base(root)/'collector.lock').open('a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        failures=0;private_next=0
+def collect_auxiliary(root):
+    # Public-provider and geocoding latency must not delay private radar reports.
+    try:
+        from air_traffic_archive import collect_due
+        collect_due(root)
+        refresh_region(root)
+    except Exception:
+        pass
+
+def poll(root):
+    failures=0;private_next=0;auxiliary=None
+    with ThreadPoolExecutor(max_workers=1,thread_name_prefix='air-context') as pool:
         while True:
-            if time.time()>=private_next:
+            started=time.monotonic()
+            if started>=private_next:
                 delay=POLL
                 try:
                     snap=collect_once(root);failures=0
@@ -243,14 +250,18 @@ def run(root):
                         if error.code==429:
                             with contextlib.suppress(ValueError):delay=max(delay,float(error.headers.get('Retry-After','60')))
                     atomic(base(root)/'collector-status.json',dict(status='retrying',epoch=time.time(),error=type(error).__name__,next_attempt=time.time()+delay))
-                private_next=time.time()+delay
-            try:
-                from air_traffic_archive import collect_due
-                collect_due(root)
-                refresh_region(root)
-            except Exception:
-                pass  # A public provider failure cannot interrupt the private radar.
-            time.sleep(POLL)
+                    started=time.monotonic()  # Honor backoff after a failed request.
+                private_next=started+delay
+            if auxiliary is None or auxiliary.done():auxiliary=pool.submit(collect_auxiliary,root)
+            time.sleep(max(.1,min(POLL,private_next-time.monotonic())))
+
+def run(root):
+    root=Path(root).resolve()
+    if not str(root).startswith('/Volumes/') or not Path('/Volumes',root.parts[2]).is_mount():raise SystemExit('External field storage unavailable')
+    base(root).mkdir(parents=True,exist_ok=True)
+    with (base(root)/'collector.lock').open('a') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        poll(root)
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);args=parser.parse_args();run(args.root)
