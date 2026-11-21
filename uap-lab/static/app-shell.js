@@ -219,3 +219,6 @@
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
  void refresh();
 })();
+
+// Aircraft radar and private center settings.
+if(window.FIELD_PUBLIC_READ_ONLY!==true){const script=document.createElement("script");script.src="/air-traffic.js?v=1";document.head.append(script);}
