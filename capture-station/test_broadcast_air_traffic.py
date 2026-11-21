@@ -5,6 +5,19 @@ class AircraftOverlayTests(unittest.TestCase):
  def setUp(self):
   self.overlay=AircraftOverlay('/not-mounted');self.overlay.config=dict(latitude=37.4083,longitude=-122.179,radius_nm=15/1.150779448)
   self.overlay.data=dict(provider='adsb.lol',license='ODbL-1.0',sampled_epoch=1000,center=self.overlay.config,radius_nm=self.overlay.config['radius_nm'],aircraft=[dict(latitude=37.42,longitude=-122.17,track_deg=45)])
+ def test_counts_match_plotted_aircraft_and_bearing_wedge(self):
+  from unittest.mock import patch
+  from PIL import ImageDraw
+  self.overlay.config.update(latitude=0,longitude=0,camera_azimuth_deg=0)
+  self.overlay.data['aircraft']=[dict(latitude=.05,longitude=.001),dict(latitude=.1,longitude=-.001),dict(latitude=0,longitude=.1),dict(latitude=40,longitude=40)]
+  original=ImageDraw.ImageDraw.text;labels=[]
+  def capture(draw,xy,text,*args,**kwargs):
+   labels.append(text);return original(draw,xy,text,*args,**kwargs)
+  with patch.object(ImageDraw.ImageDraw,'text',capture):self.overlay.render((255,255,255,255),1010)
+  self.assertIn('3 aircraft',labels);self.assertIn('2 in Field of View',labels)
+  labels.clear()
+  with patch.object(ImageDraw.ImageDraw,'text',capture):self.overlay.render((255,255,255,255),1300)
+  self.assertIn('Data unavailable',labels);self.assertFalse(any('Field of View' in t for t in labels))
  def test_private_provider_is_never_broadcast(self):
   self.overlay.data['provider']='adsb.fi';self.assertEqual(self.overlay.reports(1010)[0],[])
  def test_stale_reports_disappear(self):self.assertFalse(self.overlay.reports(1211)[2])

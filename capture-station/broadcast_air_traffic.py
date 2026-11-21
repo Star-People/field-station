@@ -24,8 +24,7 @@ class AircraftOverlay:
  def render(self,ink,now=None):
   now=time.time() if now is None else now;reports,age,valid=self.reports(now)
   canvas=Image.new('RGBA',(460,490));draw=ImageDraw.Draw(canvas);cx,cy,r=230,252,182
-  draw.text((0,0),'Air traffic',font=self.font,fill=ink)
-  draw.text((460,2),f'{int(age)}s ago' if valid else 'Data unavailable',font=self.small,fill=ink,anchor='rt')
+  draw.text((0,0),'Air traffic',font=self.font,fill=ink,anchor='lt')
   azimuth=self.config.get('camera_azimuth_deg')
   oriented=isinstance(azimuth,(int,float)) and not isinstance(azimuth,bool) and math.isfinite(azimuth) and 0<=azimuth<360
   heading=math.radians(azimuth) if oriented else 0
@@ -44,8 +43,9 @@ class AircraftOverlay:
    angle=0
    for start in range(0,r,15):
     end=min(start+8,r);draw.line((cx+math.sin(angle)*start,cy-math.cos(angle)*start,cx+math.sin(angle)*end,cy-math.cos(angle)*end),fill=ink,width=2)
-   draw.text((0,28),f"Camera {azimuth:g}° · {fov['focal_length_mm']:g} mm",font=self.small,fill=ink)
+   draw.text((0,28),f"Camera {azimuth:g}° · {fov['focal_length_mm']:g} mm",font=self.small,fill=ink,anchor='lt')
   radius=self.config.get('radius_nm',15/1.150779448);center=self.config
+  total=0;in_view=0
   for a in reports:
    try:
     p1,p2=math.radians(center['latitude']),math.radians(a['latitude']);dl=math.radians(a['longitude']-center['longitude']);dp=p2-p1
@@ -53,12 +53,18 @@ class AircraftOverlay:
     distance=3440.065*2*math.asin(math.sqrt(max(0,min(1,h))))
     if distance>radius:continue
     bearing=math.atan2(math.sin(dl)*math.cos(p2),math.cos(p1)*math.sin(p2)-math.sin(p1)*math.cos(p2)*math.cos(dl))
+    if not all(math.isfinite(v) for v in (distance,bearing)):continue
+    total+=1
+    delta=math.atan2(math.sin(bearing-heading),math.cos(bearing-heading))
+    if oriented and abs(delta)<=math.radians(fov['azimuth_span_deg']/2):in_view+=1
     x=cx+math.sin(bearing-heading)*distance/radius*r;y=cy-math.cos(bearing-heading)*distance/radius*r
     track=a.get('track_deg')
     if isinstance(track,(int,float)) and math.isfinite(track):
      theta=math.radians(track)-heading;points=[(x+px*math.cos(theta)-py*math.sin(theta),y+px*math.sin(theta)+py*math.cos(theta)) for px,py in [(0,-9),(6,6),(0,3),(-6,6)]];draw.polygon(points,fill=ink)
     else:draw.ellipse((x-3,y-3,x+3,y+3),fill=ink)
    except (KeyError,TypeError,ValueError):continue
+  draw.text((460,0),f'{total} aircraft' if valid else 'Data unavailable',font=self.small,fill=ink,anchor='rt')
+  if valid and oriented:draw.text((460,28),f'{in_view} in Field of View',font=self.small,fill=ink,anchor='rt')
   draw.text((0,488),'ADSB.lol · ODbL',font=self.small,fill=ink,anchor='lb');draw.text((460,488),f'{round(radius*1.150779448)} mi radius',font=self.small,fill=ink,anchor='rb')
   return canvas.resize((230,245),Image.Resampling.LANCZOS)
  def draw(self,canvas,ink):
