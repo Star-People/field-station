@@ -266,12 +266,12 @@ def label_batch(data,body):
  items=body.get('items')
  if not isinstance(items,list) or not 1<=len(items)<=50 or any(not isinstance(i,dict) for i in items):raise ValueError('Choose between 1 and 50 objects')
  from label_queue import lease_videos
- lease_videos(data,[i['id'] for i in items if isinstance(i.get('id'),str) and re.fullmatch('[a-f0-9]{32}',i['id'])])
  results=[]
  reset_before=read(Path(data)/'review-pending-reset.json',{}).get('epoch',0)
  from review_receipts import split
  results,items=split(data,items,reset_before)
  if not items:return dict(results=results)
+ lease_videos(data,[i['id'] for i in items if isinstance(i.get('id'),str) and re.fullmatch('[a-f0-9]{32}',i['id'])])
  if not _SAVE_LOCK.acquire(timeout=1):
   return dict(results=results+[dict(saved=False,retryable=True,id=i.get('id'),request_id=i.get('request_id'),error='Reviews are saving; retry shortly') for i in items])
  try:
