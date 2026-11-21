@@ -55,24 +55,12 @@
    const range=latest?.radius_nm||(15/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi radius',464,468);
    if(Number.isFinite(latest?.camera_azimuth_deg)){const angle=0,x=cx+Math.sin(angle)*r,y=cy-Math.cos(angle)*r;ctx.save();ctx.setLineDash([8,7]);ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(x,y);ctx.stroke();ctx.restore();ctx.textAlign='left';ctx.font='20px \"IBM Plex Mono\", monospace';ctx.fillText('Camera '+latest.camera_azimuth_deg+'°',26,48);}
    if(latest?.center){
-    const labels=[],marks=[];ctx.font=(canvas.clientWidth<180?'25':'18')+'px "IBM Plex Mono", monospace';
-    for(const landmark of latest.landmarks||[]){const p=position(landmark,latest.center);if(p.distance>range)continue;marks.push({landmark,x:cx+Math.sin(p.bearing-heading)*p.distance/range*r,y:cy-Math.cos(p.bearing-heading)*p.distance/range*r});}
-    // Keep coordinates fixed. Resolve text collisions separately, with a leader
-    // connecting every label to its actual marker in the camera-up projection.
-    const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
-    for(const mark of marks){const {x,y,landmark}=mark,label=landmark.label.length>18?landmark.label.slice(0,17)+'…':landmark.label,w=ctx.measureText(label).width,h=canvas.clientWidth<180?25:18;
-     let box=null;
-     for(const offset of [-12,22,-40,50,-68,78,-96,106]){for(const side of [x>cx?-1:1,x>cx?1:-1]){
-      const left=side>0?x+16:x-16-w,top=y+offset-h,candidate={left,right:left+w,top,bottom:top+h};
-      if(left<10||candidate.right>510||top<60||candidate.bottom>450)continue;
-      const padded={left:left-5,right:candidate.right+5,top:top-5,bottom:candidate.bottom+5};
-      if(labels.some(v=>overlaps(padded,v))||marks.some(v=>overlaps(padded,{left:v.x-9,right:v.x+9,top:v.y-9,bottom:v.y+9})))continue;
-      box=candidate;break;
-     }if(box)break;}
-     if(box){labels.push(box);const endX=Math.max(box.left,Math.min(box.right,x)),endY=Math.max(box.top,Math.min(box.bottom,y)),dx=endX-x,dy=endY-y,length=Math.hypot(dx,dy);
-      ctx.save();ctx.globalAlpha=.6;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x+dx/length*8,y+dy/length*8);ctx.lineTo(endX,endY);ctx.stroke();ctx.restore();ctx.textAlign='left';ctx.fillText(label,box.left,box.bottom);
-     }
+    ctx.font=(canvas.clientWidth<180?'25':'18')+'px "IBM Plex Mono", monospace';
+    for(const landmark of latest.landmarks||[]){const p=position(landmark,latest.center);if(p.distance>range)continue;
+     const x=cx+Math.sin(p.bearing-heading)*p.distance/range*r,y=cy-Math.cos(p.bearing-heading)*p.distance/range*r;
      ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.strokeRect(-5,-5,10,10);ctx.restore();points.push({x,y,landmark});
+     const label=landmark.label.length>18?landmark.label.slice(0,17)+'…':landmark.label;
+     ctx.save();ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(label,x,y+12);ctx.restore();
     }
    }
    if(latest?.status!=='available')return;
