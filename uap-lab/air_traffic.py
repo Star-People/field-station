@@ -87,8 +87,8 @@ def normalize(payload, config, now):
                 center=dict(address=config['address'],latitude=config['latitude'],longitude=config['longitude']),
                 radius_nm=config['radius_nm'],aircraft=aircraft)
 
-def database(root, writable=False):
-    path=base(root)/'history.sqlite'
+def database(root, writable=False, namespace=""):
+    path=base(root)/(namespace+'history.sqlite')
     if writable:
         db=sqlite3.connect(path,timeout=.1)
         db.execute('PRAGMA journal_mode=WAL');db.execute('PRAGMA busy_timeout=100')
@@ -96,9 +96,9 @@ def database(root, writable=False):
     else:db=sqlite3.connect(path.as_uri()+'?mode=ro',uri=True,timeout=.1)
     return db
 
-def store(root, snapshot):
+def store(root, snapshot, namespace=""):
     data=zlib.compress(json.dumps(snapshot,separators=(',',':')).encode())
-    with contextlib.closing(database(root,True)) as db,db:
+    with contextlib.closing(database(root,True,namespace)) as db,db:
         db.execute('INSERT OR REPLACE INTO snapshots VALUES(?,?,?)',(snapshot['sampled_epoch'],snapshot['center_id'],data))
         db.execute('DELETE FROM snapshots WHERE epoch<?',(time.time()-72*3600,))
         # Compressed history payload capped at 64 MiB; SQLite reuses its freed pages.
@@ -107,7 +107,7 @@ def store(root, snapshot):
             for epoch,length in db.execute('SELECT epoch,length(body) FROM snapshots ORDER BY epoch').fetchall():
                 db.execute('DELETE FROM snapshots WHERE epoch=?',(epoch,));size-=length
                 if size<=60*1024**2:break
-    atomic(base(root)/'latest.json',snapshot)
+    atomic(base(root)/(namespace+'latest.json'),snapshot)
 
 def live(root, now=None):
     now=time.time() if now is None else now
@@ -119,15 +119,15 @@ def live(root, now=None):
     else:result['aircraft']=[a for a in result.get('aircraft',[]) if 0<=now-a['position_epoch']<=MAX_AGE]
     return result
 
-def at_time(root, epoch):
+def at_time(root, epoch, namespace="", max_age=MAX_AGE):
     if not number(epoch) or epoch<=0:return dict(status='unavailable',reason='Capture time unavailable',aircraft=[])
     try:
-        with contextlib.closing(database(root)) as db:
+        with contextlib.closing(database(root,namespace=namespace)) as db:
             # Only measurements taken at or before capture, never present-day data for an old detection.
-            row=db.execute('SELECT body FROM snapshots WHERE epoch<=? AND epoch>=? ORDER BY epoch DESC LIMIT 1',(epoch,epoch-MAX_AGE)).fetchone()
+            row=db.execute('SELECT body FROM snapshots WHERE epoch<=? AND epoch>=? ORDER BY epoch DESC LIMIT 1',(epoch,epoch-max_age)).fetchone()
         if row:
             result=json.loads(zlib.decompress(row[0]));result['detection_epoch']=epoch
-            result['aircraft']=[a for a in result['aircraft'] if 0<=epoch-a['position_epoch']<=MAX_AGE]
+            result['aircraft']=[a for a in result['aircraft'] if 0<=epoch-a['position_epoch']<=max_age]
             result['sample_offset_seconds']=round(epoch-result['sampled_epoch'],1)
             return result
     except (OSError,ValueError,sqlite3.Error,zlib.error):pass
@@ -136,8 +136,10 @@ def at_time(root, epoch):
 def attach(root, folder, event):
     """Bounded local read only; failures cannot interrupt capture or human labels."""
     path=Path(folder)/'air-traffic.private.json'
-    if path.exists():return
-    try:atomic(path,at_time(root,event.get('detected_epoch')))
+    try:
+        if not path.exists():atomic(path,at_time(root,event.get('detected_epoch')))
+        from air_traffic_archive import attach_public
+        attach_public(root,folder,event)
     except (OSError,ValueError,sqlite3.Error):pass
 
 def detection(root, folder, event):
@@ -155,20 +157,27 @@ def run(root):
     base(root).mkdir(parents=True,exist_ok=True)
     with (base(root)/'collector.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        failures=0
+        failures=0;private_next=0
         while True:
-            delay=POLL
+            if time.time()>=private_next:
+                delay=POLL
+                try:
+                    snap=collect_once(root);failures=0
+                    atomic(base(root)/'collector-status.json',dict(status='collecting',epoch=time.time(),aircraft=len(snap['aircraft'])))
+                except Exception as error:
+                    failures+=1;delay=min(900,15*2**min(failures,6))
+                    if isinstance(error,HTTPError):
+                        if error.code in (400,401,403,404):delay=3600
+                        if error.code==429:
+                            with contextlib.suppress(ValueError):delay=max(delay,float(error.headers.get('Retry-After','60')))
+                    atomic(base(root)/'collector-status.json',dict(status='retrying',epoch=time.time(),error=type(error).__name__,next_attempt=time.time()+delay))
+                private_next=time.time()+delay
             try:
-                snap=collect_once(root);failures=0
-                atomic(base(root)/'collector-status.json',dict(status='collecting',epoch=time.time(),aircraft=len(snap['aircraft'])))
-            except Exception as error:
-                failures+=1;delay=min(900,15*2**min(failures,6))
-                if isinstance(error,HTTPError):
-                    if error.code in (400,401,403,404):delay=3600
-                    if error.code==429:
-                        with contextlib.suppress(ValueError):delay=max(delay,float(error.headers.get('Retry-After','60')))
-                atomic(base(root)/'collector-status.json',dict(status='retrying',epoch=time.time(),error=type(error).__name__,next_attempt=time.time()+delay))
-            time.sleep(delay)
+                from air_traffic_archive import collect_due
+                collect_due(root)
+            except Exception:
+                pass  # A public provider failure cannot interrupt the private radar.
+            time.sleep(POLL)
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--root',type=Path,required=True);args=parser.parse_args();run(args.root)

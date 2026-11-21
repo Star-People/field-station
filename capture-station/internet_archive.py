@@ -185,8 +185,17 @@ class InternetArchive:
         from station_location import location_at
         manifest=dict(manifest,observation_location=location_at(self.data.parent,manifest.get('started_epoch',0)),location_scope='session_start')
         """Archive the finalized session record, excluding raw/scratch video."""
+        from air_traffic_archive import bundle as traffic_bundle
+        traffic_path=traffic_bundle(self.data.parent,self.folder(job['id']),manifest)
+        traffic_hash=hashes(traffic_path)['sha256']
+        traffic_changed=job.get('air_traffic_sha256')!=traffic_hash
         from manual_archive import enabled,plan
-        if enabled(self,manifest):return plan(self,job,manifest)
+        if enabled(self,manifest):
+            if traffic_changed:job['manual_plan_version']=0
+            changed=plan(self,job,manifest)
+            job['air_traffic_sha256']=traffic_hash
+            return changed
+
         decision=load(self.folder(job['id'])/'archive-decision.json',{})
         recovery=load(self.folder(job['id'])/'recovery-publication.json',{})
         recovery_changed=job.get('recovered_evidence')!=recovery and recovery.get('operator_approved') is True
@@ -207,7 +216,7 @@ class InternetArchive:
                     if not tags_path.exists():save(tags_path,dict(tags=[],revision=secrets.token_hex(16),saved_epoch=time.time()))
         priority=max(decision.get('reviewed_epoch',0),load(self.folder(job['id'])/'review-trim.json',{}).get('saved_epoch',0),recovery.get('approved_epoch',0) if recovery.get('operator_approved') is True else 0)
         priority_changed=job.get('manual_priority_epoch')!=priority;job['manual_priority_epoch']=priority
-        if job.get('plan_version')==5 and job.get('review_revision')==decision.get('review_revision') and not recovery_changed:return priority_changed
+        if job.get('plan_version')==5 and job.get('review_revision')==decision.get('review_revision') and not recovery_changed and not traffic_changed:return priority_changed
         folder=self.folder(job['id']);old_files=list(job['files']);old_length=len(old_files);known={e['name'] for e in job['files']}
         changed=[]
         # Preview samples are not reviewed evidence. Only publish indexed pairs.
@@ -215,7 +224,7 @@ class InternetArchive:
         removed=len(job['files'])!=old_length
         known={e['name'] for e in job['files']}
         for i,entry in enumerate(job['files']):
-            if entry['name'] in ('archive-decision.json','review-annotations.json','review-trim.json','video-trim.json','video.mp4','video-annotated.mp4'):
+            if entry['name'] in ('air-traffic.json','archive-decision.json','review-annotations.json','review-trim.json','video-trim.json','video.mp4','video-annotated.mp4'):
                 updated=dict(name=entry['name'],**hashes(folder/entry['name']))
                 if updated!=entry:job['files'][i]=updated;changed.append(i)
         for path in sorted(folder.iterdir()):
@@ -273,7 +282,7 @@ class InternetArchive:
             first_new=next(i for i,e in enumerate(job['files']) if e['name']=='archive-index.json')
             job['files'][first_new]=inventory_entry
         else:job['files'].append(inventory_entry)
-        job['frame_count']=manifest.get('video_playback',{}).get('frame_count');job['plan_version']=5;job['review_revision']=decision.get('review_revision');job['total_bytes']=sum(e['bytes'] for e in job['files'])
+        job['air_traffic_sha256']=traffic_hash;job['frame_count']=manifest.get('video_playback',{}).get('frame_count');job['plan_version']=5;job['review_revision']=decision.get('review_revision');job['total_bytes']=sum(e['bytes'] for e in job['files'])
         if removed or changed or len(job['files'])>old_length:
             first_new=0 if removed else min([first_new,*changed,job.get('file_index',0)])
         if (removed or changed or len(job['files'])>old_length) and job['state'] in ('uploading','completing','verifying','retaining','cleaned','failed'):
