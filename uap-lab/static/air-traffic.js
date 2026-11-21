@@ -51,7 +51,7 @@
    ctx.globalAlpha=.24;ctx.beginPath();ctx.moveTo(cx-r,cy);ctx.lineTo(cx+r,cy);ctx.moveTo(cx,cy-r);ctx.lineTo(cx,cy+r);ctx.stroke();ctx.globalAlpha=1;
    for(const [label,x,y] of [['N',cx,26],['E',502,cy+6],['S',cx,508],['W',18,cy+6]])ctx.fillText(label,x,y);
    ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
-   const range=latest?.radius_nm||(15/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi',464,468);
+   const range=latest?.radius_nm||(15/1.150779448);ctx.font=(canvas.clientWidth<180?'24':'16')+'px "IBM Plex Mono", monospace';ctx.textAlign='right';ctx.fillText(Math.round(range*1.150779448)+' mi radius',464,468);
    if(latest?.center){
     const labels=[];ctx.font=(canvas.clientWidth<180?'25':'18')+'px "IBM Plex Mono", monospace';
     for(const landmark of latest.landmarks||[]){const p=position(landmark,latest.center);if(p.distance>range)continue;const x=cx+Math.sin(p.bearing)*p.distance/range*r,y=cy-Math.cos(p.bearing)*p.distance/range*r;

@@ -43,7 +43,7 @@ class AircraftOverlay:
      theta=math.radians(track);points=[(x+px*math.cos(theta)-py*math.sin(theta),y+px*math.sin(theta)+py*math.cos(theta)) for px,py in [(0,-9),(6,6),(0,3),(-6,6)]];draw.polygon(points,fill=ink)
     else:draw.ellipse((x-3,y-3,x+3,y+3),fill=ink)
    except (KeyError,TypeError,ValueError):continue
-  draw.text((0,488),'ADSB.lol · ODbL',font=self.small,fill=ink,anchor='lb');draw.text((460,488),f'{round(radius*1.150779448)} mi',font=self.small,fill=ink,anchor='rb')
+  draw.text((0,488),'ADSB.lol · ODbL',font=self.small,fill=ink,anchor='lb');draw.text((460,488),f'{round(radius*1.150779448)} mi radius',font=self.small,fill=ink,anchor='rb')
   return canvas.resize((230,245),Image.Resampling.LANCZOS)
  def draw(self,canvas,ink):
   self.read();canvas.alpha_composite(self.render(ink),(30,canvas.height-305))
