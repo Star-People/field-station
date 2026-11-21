@@ -18,3 +18,6 @@
 #liveTelemetry>.rf-overlay,#liveTelemetry>.air-radar{position:relative;inset:auto;width:100%;min-width:0;max-width:none;margin:0;box-sizing:border-box;flex:none}
 #liveTelemetry>.rf-overlay{padding:0}
 @media(max-width:600px){#liveTelemetry{left:auto;right:10px;bottom:max(10px,env(safe-area-inset-bottom));width:170px;gap:12px;max-height:calc(100% - 76px)}}
+
+#liveTelemetry>.air-radar::before{content:"";position:absolute;left:0;right:0;top:-8px;border-top:1px solid currentColor;pointer-events:none}
+@media(max-width:600px){#liveTelemetry>.air-radar::before{top:-6px}}

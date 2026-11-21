@@ -75,6 +75,8 @@ class OverlayPipe:
   self.tag_renderer.draw(canvas,self.tags,time.time(),standby)
   if standby:ImageDraw.Draw(canvas).rectangle((LEFT-10,OUTPUT_HEIGHT-BOTTOM-HEIGHT-10,LEFT+WIDTH+10,OUTPUT_HEIGHT-BOTTOM+10),fill=(8,19,13,242),outline=(155,201,140,255),width=1)
   canvas.alpha_composite(rf,(LEFT,OUTPUT_HEIGHT-BOTTOM-HEIGHT))
+  ink=(155,201,140,255) if standby else ((17,17,17,255) if self.renderer.bright else (255,255,255,255))
+  ImageDraw.Draw(canvas).line((LEFT,OUTPUT_HEIGHT-BOTTOM+7,LEFT+WIDTH-1,OUTPUT_HEIGHT-BOTTOM+7),fill=ink,width=1)
   return canvas
  def poll_tags(self):
   while not self.stop.is_set():
