@@ -46,7 +46,12 @@ def save_settings(root, value):
     with (directory/'settings.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
         config=settings(root)
-        if address==config['address']:return config
+        radius=value.get('radius_miles',config['radius_nm']*1.150779448)
+        if not number(radius) or not 1<=radius<=100:raise ValueError('Radar radius must be between 1 and 100 miles.')
+        config['radius_nm']=radius/1.150779448
+        if address==config['address']:
+            config['updated_epoch']=time.time();atomic(directory/'settings.json',config)
+            return config
         if address.casefold() in ('stanford dish','the stanford dish',DEFAULT['address'].casefold()):
             lat,lon=DEFAULT['latitude'],DEFAULT['longitude'];resolved=DEFAULT['address']
         else:

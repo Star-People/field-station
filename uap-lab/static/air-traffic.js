@@ -12,13 +12,13 @@
  const settings=document.querySelector('#stationSettings');
  if(settings){
   const area=document.createElement('div');area.className='air-traffic-settings';
-  area.innerHTML='<label for="radarAddress">Radar center address</label><div class="radar-address-row"><input id="radarAddress" type="text" autocomplete="off" maxlength="250" placeholder="Address or landmark"><button id="radarAddressSave" type="button">Save</button></div><p id="radarAddressStatus" role="status"></p>';
+  area.innerHTML='<label for="radarAddress">Radar center address</label><div class="radar-address-row"><input id="radarAddress" type="text" autocomplete="off" maxlength="250" placeholder="Address or landmark"></div><label for="radarRadius">Radar radius (miles)</label><div class="radar-address-row"><input id="radarRadius" type="number" min="1" max="100" step="1" value="10"><button id="radarAddressSave" type="button">Save</button></div><p id="radarAddressStatus" role="status"></p>';
   settings.insertBefore(area,settings.querySelector('#stationLocation'));
-  const input=area.querySelector('input'),button=area.querySelector('button'),status=area.querySelector('p');let dirty=false,busy=false;
-  input.addEventListener('input',()=>{dirty=true;status.textContent='';});
-  async function load(){if(dirty||busy)return;try{const s=await api('/api/air-traffic/settings');input.value=s.address;}catch(e){status.textContent=e.message;}}
+  const input=area.querySelector('#radarAddress'),radius=area.querySelector('#radarRadius'),button=area.querySelector('button'),status=area.querySelector('p');let dirty=false,busy=false;
+  for(const control of [input,radius])control.addEventListener('input',()=>{dirty=true;status.textContent='';});
+  async function load(){if(dirty||busy)return;try{const s=await api('/api/air-traffic/settings');input.value=s.address;radius.value=Math.round(s.radius_nm*1.150779448);}catch(e){status.textContent=e.message;}}
   document.querySelector('#stationSettingsOpen')?.addEventListener('click',load);
-  async function save(){if(busy)return;busy=true;button.disabled=true;input.disabled=true;status.textContent='Finding radar center…';try{const s=await api('/api/air-traffic/settings',{address:input.value});input.value=s.address;dirty=false;status.textContent='Saved · '+(s.resolved_address||s.address);window.dispatchEvent(new Event('radar-center-changed'));}catch(e){status.textContent=e.message;}finally{busy=false;button.disabled=false;input.disabled=false;}}
+  async function save(){if(busy)return;busy=true;button.disabled=true;input.disabled=true;radius.disabled=true;status.textContent='Saving radar settings…';try{const s=await api('/api/air-traffic/settings',{address:input.value,radius_miles:Number(radius.value)});input.value=s.address;radius.value=Math.round(s.radius_nm*1.150779448);dirty=false;status.textContent='Saved · '+(s.resolved_address||s.address);window.dispatchEvent(new Event('radar-center-changed'));}catch(e){status.textContent=e.message;}finally{busy=false;button.disabled=false;input.disabled=false;radius.disabled=false;}}
   button.addEventListener('click',save);input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();save();}});
  }
  const viewer=document.querySelector('#liveViewer');

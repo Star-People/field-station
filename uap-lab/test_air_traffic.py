@@ -12,6 +12,14 @@ class TrafficTests(unittest.TestCase):
   return dict(now=self.now*1000,ac=[row])
  def snapshot(self):return a.normalize(self.payload(),a.DEFAULT,self.now)
  def test_outside_ten_miles_excluded(self):self.assertEqual(a.normalize(self.payload(lat=37.7),a.DEFAULT,self.now)['aircraft'],[])
+ def test_radius_only_update_needs_no_geocoding(self):
+  with patch.object(a,'fetch_json',side_effect=AssertionError('network')):
+   result=a.save_settings(self.root,{'address':a.DEFAULT['address'],'radius_miles':25})
+  self.assertAlmostEqual(result['radius_nm']*1.150779448,25)
+ def test_invalid_radius_preserves_settings(self):
+  for radius in [0,101,'10',True,float('nan')]:
+   with self.assertRaises(ValueError):a.save_settings(self.root,{'address':a.DEFAULT['address'],'radius_miles':radius})
+  self.assertEqual(a.settings(self.root),a.DEFAULT)
  def test_ground_excluded(self):self.assertEqual(a.normalize(self.payload(alt_baro='ground'),a.DEFAULT,self.now)['aircraft'],[])
  def test_stale_position_excluded(self):self.assertEqual(a.normalize(self.payload(seen_pos=31),a.DEFAULT,self.now)['aircraft'],[])
  def test_missing_direction_is_not_north(self):
