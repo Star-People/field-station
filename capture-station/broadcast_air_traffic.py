@@ -86,7 +86,7 @@ class AircraftOverlay:
   pitch=fov['elevation_deg']
   detail=f'{pitch:g}° ↑ · {fov["vertical_deg"]:.1f}° FoV' if pitch is not None else 'Set camera elevation'
   draw.text((460,502),detail,font=self.small,fill=ink,anchor='rt')
-  side=Image.new('RGBA',(460,240));sd=ImageDraw.Draw(side);x0,y0,w,top=40,200,400,20;scale=w/radius
+  side=Image.new('RGBA',(460,240));sd=ImageDraw.Draw(side);x0,y0,w,top=0,200,440,20;scale=w/radius
   # Cone is drawn on a clipped layer so steep elevation never covers headings.
   cone=Image.new('RGBA',(w,y0-top));cd=ImageDraw.Draw(cone)
   if pitch is not None:
@@ -106,7 +106,7 @@ class AircraftOverlay:
    if v['in_fov']:sd.rectangle((x-8,y-8,x+8,y+8),outline=ink,width=2)
   sd.ellipse((x0-3,y0-3,x0+3,y0+3),fill=ink)
   note='Awaiting fresh aircraft data' if not valid else 'Station elevation unavailable' if self.station_altitude_ft is None else None
-  if note:sd.text((240,100),note,font=self.small,fill=ink,anchor='mm')
+  if note:sd.text((220,100),note,font=self.small,fill=ink,anchor='mm')
   canvas.alpha_composite(side,(0,530))
   draw.text((0,788),'ADSB.lol · ODbL',font=self.small,fill=ink,anchor='lb');draw.text((460,788),f'{round(radius*1.150779448)} mi radius',font=self.small,fill=ink,anchor='rb')
   if self.terrain_source=='Copernicus / Open-Meteo':draw.text((0,810),'Terrain: Copernicus / Open-Meteo',font=self.small,fill=ink,anchor='lb')
